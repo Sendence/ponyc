@@ -58,6 +58,16 @@ class WriteBuffer
   var _offset: USize = 0
   var _size: USize = 0
 
+  fun ref reserve_chunks(size': USize): WriteBuffer^ =>
+    """
+    Reserve space for size' chunks.
+
+    This needs to be recalled after every call to `done`
+    as `done` resets the chunks.
+    """
+    _chunks.reserve(size')
+    this
+
   fun ref reserve(size': USize): WriteBuffer^ =>
     """
     Reserve space for size additional bytes.

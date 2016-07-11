@@ -14,7 +14,8 @@ enum
   FLAG_RC_CHANGED = 1 << 1,
   FLAG_SYSTEM = 1 << 2,
   FLAG_UNSCHEDULED = 1 << 3,
-  FLAG_PENDINGDESTROY = 1 << 4,
+  FLAG_BACKPRESSURE = 1 << 4,
+  FLAG_PENDINGDESTROY = 1 << 5,
 };
 
 static bool actor_noblock = false;
@@ -124,6 +125,7 @@ static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
 bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 {
   ctx->current = actor;
+  ctx->loaded_sends = 0;
 
   pony_msg_t* msg;
   size_t app = 0;
@@ -141,8 +143,15 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
       app++;
       try_gc(ctx, actor);
 
-      if(app == batch)
+      if((app == batch) || (ctx->loaded_sends > 0))
+      {
+        // If we have reached our batch limit or we are sending to loaded
+        // queues, mark our queue as loaded and stop handling messages.
+        if(!has_flag(actor, FLAG_SYSTEM))
+          actor->loaded_queue = true;
+
         return !has_flag(actor, FLAG_UNSCHEDULED);
+      }
     }
   }
 
@@ -157,20 +166,27 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
       app++;
       try_gc(ctx, actor);
 
-      if(app == batch)
+      if((app == batch) || (ctx->loaded_sends > 0))
+      {
+        // If we have reached our batch limit or we are sending to loaded
+        // queues, mark our queue as loaded and stop handling messages.
+        if(!has_flag(actor, FLAG_SYSTEM))
+          actor->loaded_queue = true;
+
         return !has_flag(actor, FLAG_UNSCHEDULED);
+      }
     }
 
     // Stop handling a batch if we reach the head we found when we were
-    // scheduled.
-    if(msg == head)
+    // scheduled, or if a continuation was scheduled.
+    if((msg == head) || (actor->continuation != NULL))
       break;
   }
 
   // We didn't hit our app message batch limit. We now believe our queue to be
   // empty, but we may have received further messages.
-  assert(app < batch);
   try_gc(ctx, actor);
+  actor->loaded_queue = has_flag(actor, FLAG_BACKPRESSURE);
 
   if(has_flag(actor, FLAG_UNSCHEDULED))
   {
@@ -346,6 +362,9 @@ void pony_sendv(pony_ctx_t* ctx, pony_actor_t* to, pony_msg_t* m)
   {
     if(!has_flag(to, FLAG_UNSCHEDULED))
       ponyint_sched_add(ctx, to);
+  } else {
+    if(to->loaded_queue)
+      ctx->loaded_sends++;
   }
 }
 
@@ -396,7 +415,8 @@ void* pony_alloc_small(pony_ctx_t* ctx, uint32_t sizeclass)
   ctx->count_alloc_size += HEAP_MIN << sizeclass;
 #endif
 
-  return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass);
+  return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap,
+    sizeclass);
 }
 
 void* pony_alloc_large(pony_ctx_t* ctx, size_t size)
@@ -434,6 +454,20 @@ void* pony_alloc_final(pony_ctx_t* ctx, size_t size, pony_final_fn final)
 void pony_triggergc(pony_actor_t* actor)
 {
   actor->heap.next_gc = 0;
+}
+
+void pony_setbackpressure(pony_actor_t* actor)
+{
+  // Set the backpressure flag and immediately mark the queue as loaded.
+  set_flag(actor, FLAG_BACKPRESSURE);
+  actor->loaded_queue = true;
+}
+
+void pony_unsetbackpressure(pony_actor_t* actor)
+{
+  // Unset the backpressure flag. The queue may be marked as unloaded in
+  // ponyint_actor_run.
+  unset_flag(actor, FLAG_BACKPRESSURE);
 }
 
 void pony_schedule(pony_ctx_t* ctx, pony_actor_t* actor)

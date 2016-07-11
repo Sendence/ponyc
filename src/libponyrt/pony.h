@@ -205,6 +205,20 @@ ATTRIBUTE_MALLOC(void* pony_alloc_final(pony_ctx_t* ctx, size_t size,
 /// Trigger GC next time the current actor is scheduled
 void pony_triggergc(pony_actor_t* actor);
 
+/** Set back pressure on this actor.
+ *
+ * Behave as if the queue is loaded, even when it is not. This should be used
+ * when an actor that performs I/O receives backpressure on its output channel,
+ * for example when unable to write all available data to a socket.
+ */
+void pony_setbackpressure(pony_actor_t* actor);
+
+/** Unset back pressure on this actor.
+ *
+ * Stop behaving as if the queue is loaded when it is not.
+ */
+void pony_unsetbackpressure(pony_actor_t* actor);
+
 /** Start gc tracing for sending.
  *
  * Call this before sending a message if it has anything in it that can be

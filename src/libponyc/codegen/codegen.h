@@ -24,6 +24,7 @@ char* LLVMGetHostCPUName();
 void LLVMSetUnsafeAlgebra(LLVMValueRef inst);
 void LLVMSetReturnNoAlias(LLVMValueRef fun);
 void LLVMSetDereferenceable(LLVMValueRef fun, uint32_t i, size_t size);
+LLVMValueRef LLVMConstNaN(LLVMTypeRef type);
 
 #define GEN_NOVALUE ((LLVMValueRef)1)
 
@@ -108,6 +109,7 @@ typedef struct compile_t
   const char* str__event_notify;
 
   LLVMCallConv callconv;
+  LLVMLinkage linkage;
   LLVMContextRef context;
   LLVMTargetMachineRef machine;
   LLVMTargetDataRef target_data;

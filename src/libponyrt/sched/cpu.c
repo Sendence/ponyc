@@ -195,9 +195,11 @@ void ponyint_cpu_affinity(uint32_t cpu)
 /**
  * Only nanosleep if sufficient cycles have elapsed.
  */
-void ponyint_cpu_core_pause(uint64_t tsc, uint64_t tsc2, bool yield)
+void ponyint_cpu_core_pause(uint64_t tsc, bool yield)
 {
   // 10m cycles is about 3ms
+  uint64_t tsc2 = ponyint_cpu_tick();
+
   if((tsc2 - tsc) < 10000000)
     return;
 

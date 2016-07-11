@@ -9,8 +9,6 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define SCHED_BATCH 100
-
 static DECLARE_THREAD_FN(run_thread);
 
 typedef enum
@@ -27,27 +25,12 @@ static uint32_t scheduler_count;
 static scheduler_t* scheduler;
 static bool volatile detect_quiescence;
 static bool use_yield;
+static size_t batch_size;
 static mpmcq_t inject;
 static __pony_thread_local scheduler_t* this_scheduler;
 
 /**
- * Gets the next actor from the scheduler queue.
- */
-static pony_actor_t* pop(scheduler_t* sched)
-{
-  return (pony_actor_t*)ponyint_mpmcq_pop(&sched->q);
-}
-
-/**
- * Puts an actor on the scheduler queue.
- */
-static void push(scheduler_t* sched, pony_actor_t* actor)
-{
-  ponyint_mpmcq_push_single(&sched->q, actor);
-}
-
-/**
- * Handles the global queue and then pops from the local queue
+ * Handles the global queue and then pops from the local active queue
  */
 static pony_actor_t* pop_global(scheduler_t* sched)
 {
@@ -56,7 +39,7 @@ static pony_actor_t* pop_global(scheduler_t* sched)
   if(actor != NULL)
     return actor;
 
-  return pop(sched);
+  return (pony_actor_t*)ponyint_mpmcq_pop(sched->active_q);
 }
 
 /**
@@ -133,13 +116,16 @@ static void read_msg(scheduler_t* sched)
  * them will stop the ASIO back end and tell the cycle detector to try to
  * terminate.
  */
-static bool quiescent(scheduler_t* sched, uint64_t tsc, uint64_t tsc2)
+static bool quiescent(scheduler_t* sched, uint64_t tsc)
 {
+  // Look for any additional messages in the queue.
   read_msg(sched);
 
   if(sched->terminate)
     return true;
 
+  // Check this here because we want to recheck it every time we don't stop the
+  // ASIO thread due to possible input but have otherwise reached quiescence.
   if(sched->ack_count == scheduler_count)
   {
     if(sched->asio_stopped)
@@ -160,7 +146,7 @@ static bool quiescent(scheduler_t* sched, uint64_t tsc, uint64_t tsc2)
     }
   }
 
-  ponyint_cpu_core_pause(tsc, tsc2, use_yield);
+  ponyint_cpu_core_pause(tsc, use_yield);
   return false;
 }
 
@@ -177,65 +163,120 @@ static scheduler_t* choose_victim(scheduler_t* sched)
     if(victim < scheduler)
       victim = &scheduler[scheduler_count - 1];
 
+    // Stop looking if we've looked at everything. This only happens with one
+    // or two scheduler threads, where the victim is always the same.
     if(victim == sched->last_victim)
+      break;
+
+    // Don't try to steal from ourself. If there's only one scheduler thread,
+    // we will steal from ourself, and it will always fail, which is fine.
+    if(victim != sched)
     {
-      // If we have tried all possible victims, return no victim. Set our last
-      // victim to ourself to indicate we've started over.
-      sched->last_victim = sched;
+      // Record that this is our victim and return it.
+      sched->last_victim = victim;
       break;
     }
-
-    // Don't try to steal from ourself.
-    if(victim == sched)
-      continue;
-
-    // Record that this is our victim and return it.
-    sched->last_victim = victim;
-    return victim;
   }
 
-  return NULL;
+  return victim;
 }
 
 /**
  * Use mpmcqs to allow stealing directly from a victim, without waiting for a
  * response.
  */
-static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
+static pony_actor_t* steal(scheduler_t* sched)
 {
   send_msg(0, SCHED_BLOCK, 0);
   uint64_t tsc = ponyint_cpu_tick();
-  pony_actor_t* actor;
 
   while(true)
   {
     scheduler_t* victim = choose_victim(sched);
-
-    if(victim == NULL)
-      victim = sched;
-
-    actor = pop_global(victim);
+    pony_actor_t* actor = pop_global(victim);
 
     if(actor != NULL)
-      break;
-
-    uint64_t tsc2 = ponyint_cpu_tick();
-
-    if(quiescent(sched, tsc, tsc2))
-      return NULL;
-
-    // If we have been passed an actor (implicitly, the cycle detector), and
-    // enough time has elapsed without stealing or quiescing, return the actor
-    // we were passed (allowing the cycle detector to run).
-    if((prev != NULL) && ((tsc2 - tsc) > 10000000000))
     {
-      actor = prev;
-      break;
+      send_msg(0, SCHED_UNBLOCK, 0);
+      return actor;
     }
+
+    if(quiescent(sched, tsc))
+      break;
   }
 
-  send_msg(0, SCHED_UNBLOCK, 0);
-  return actor;
+  return NULL;
+}
+
+static void rotate_queues(scheduler_t* sched)
+{
+  // Rotate the queues. The active queue (now empty) beomes the pressure
+  // queue, the pressure queue becomes the expired queue, and the
+  // expired queue becomes the active queue.
+  mpmcq_t* pressure_q = sched->active_q;
+  mpmcq_t* expired_q = sched->pressure_q;
+  mpmcq_t* active_q = sched->expired_q;
+
+  sched->active_q = active_q;
+  sched->expired_q = expired_q;
+  sched->pressure_q = pressure_q;
+}
+
+static pony_actor_t* next_actor(scheduler_t* sched)
+{
+  // Try the inject queue first. This prioritises actors with new ASIO events.
+  pony_actor_t* actor = (pony_actor_t*)ponyint_mpmcq_pop(&inject);
+
+  if(actor != NULL)
+    return actor;
+
+  // Try the active queue. These are actors that haven't yet had a turn.
+  actor = (pony_actor_t*)ponyint_mpmcq_pop(sched->active_q);
+
+  if(actor != NULL)
+    return actor;
+
+  // TODO: could have a no-atomic-op pop for non-active queues
+
+  // Try the expired queue. These are actors that have had a turn. This
+  // prioritises actors that have had a turn over actors that have experienced
+  // back pressure.
+  actor = (pony_actor_t*)ponyint_mpmcq_pop(sched->expired_q);
+
+  if(actor != NULL)
+  {
+    // By rotating the queues, actors that have been pressured are not left to
+    // languish; they become expired actors.
+    rotate_queues(sched);
+    return actor;
+  }
+
+  // Try the pressured actors.
+  actor = (pony_actor_t*)ponyint_mpmcq_pop(sched->pressure_q);
+
+  if(actor != NULL)
+  {
+    // If the cycle detector is the only actor on this scheduler thread, don't
+    // run it. Reschedule it and steal from another scheduler thread. This
+    // allows the program to terminate when only cycle detection work remains.
+    if(ponyint_is_cycle(actor))
+    {
+      pony_actor_t* alt = (pony_actor_t*)ponyint_mpmcq_pop(sched->pressure_q);
+      ponyint_mpmcq_push_single(sched->pressure_q, actor);
+
+      if(alt == NULL)
+        return steal(sched);
+
+      actor = alt;
+    }
+
+    rotate_queues(sched);
+    return actor;
+  }
+
+  // No actors are enqueued on this scheduler thread. Either steal an actor
+  // from some other scheduler thread, or terminate.
+  return steal(sched);
 }
 
 /**
@@ -243,57 +284,33 @@ static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
  */
 static void run(scheduler_t* sched)
 {
-  pony_actor_t* actor = pop_global(sched);
-
   while(true)
   {
+    // Handle any scheduler thread messages.
+    read_msg(sched);
+
+    // Get an actor to execute.
+    pony_actor_t* actor = next_actor(sched);
+
+    // If no actor is available, terminate this scheduler thread.
     if(actor == NULL)
+      return;
+
+    // Run and possibly reschedule the actor.
+    if(ponyint_actor_run(&sched->ctx, actor, batch_size))
     {
-      // We had an empty queue and no rescheduled actor.
-      actor = steal(sched, NULL);
-
-      if(actor == NULL)
+      if(sched->ctx.loaded_sends > 0)
       {
-        // Termination.
-        assert(pop(sched) == NULL);
-        return;
-      }
-    }
-
-    // Run the current actor and get the next actor.
-    bool reschedule = ponyint_actor_run(&sched->ctx, actor, SCHED_BATCH);
-    pony_actor_t* next = pop_global(sched);
-
-    if(reschedule)
-    {
-      if(next != NULL)
-      {
-        // If we have a next actor, we go on the back of the queue. Otherwise,
-        // we continue to run this actor.
-        push(sched, actor);
-        actor = next;
+        // If there is back pressure, or it's the cycle detector, schedule the
+        // actor on the pressure queue.
+        ponyint_mpmcq_push_single(sched->pressure_q, actor);
       } else if(ponyint_is_cycle(actor)) {
-        // If all we have is the cycle detector, try to steal something else to
-        // run as well.
-        next = steal(sched, actor);
-
-        if(next == NULL)
-        {
-          // Termination.
-          return;
-        }
-
-        // Push the cycle detector and run the actor we stole.
-        if(actor != next)
-        {
-          push(sched, actor);
-          actor = next;
-        }
+        // TODO: move into the previous clause
+        ponyint_mpmcq_push_single(sched->pressure_q, actor);
+      } else {
+        // Otherwise, schedule the actor on the expired queue.
+        ponyint_mpmcq_push_single(sched->expired_q, actor);
       }
-    } else {
-      // We aren't rescheduling, so run the next actor. This may be NULL if our
-      // queue was empty.
-      actor = next;
     }
   }
 }
@@ -328,12 +345,16 @@ static void ponyint_sched_shutdown()
 
   for(uint32_t i = 0; i < scheduler_count; i++)
   {
-    while(ponyint_messageq_pop(&scheduler[i].mq) != NULL);
-    ponyint_messageq_destroy(&scheduler[i].mq);
-    ponyint_mpmcq_destroy(&scheduler[i].q);
+    scheduler_t* sched = &scheduler[i];
+
+    while(ponyint_messageq_pop(&sched->mq) != NULL);
+    ponyint_messageq_destroy(&sched->mq);
+    ponyint_mpmcq_destroy(&sched->q1);
+    ponyint_mpmcq_destroy(&sched->q2);
+    ponyint_mpmcq_destroy(&sched->q3);
 
 #ifdef USE_TELEMETRY
-    pony_ctx_t* ctx = &scheduler[i].ctx;
+    pony_ctx_t* ctx = &sched->ctx;
 
     printf(
       "  {\n"
@@ -384,9 +405,10 @@ static void ponyint_sched_shutdown()
   ponyint_mpmcq_destroy(&inject);
 }
 
-pony_ctx_t* ponyint_sched_init(uint32_t threads, bool noyield)
+pony_ctx_t* ponyint_sched_init(uint32_t threads, bool noyield, size_t batch)
 {
   use_yield = !noyield;
+  batch_size = batch;
 
   // If no thread count is specified, use the available physical core count.
   if(threads == 0)
@@ -401,10 +423,18 @@ pony_ctx_t* ponyint_sched_init(uint32_t threads, bool noyield)
 
   for(uint32_t i = 0; i < scheduler_count; i++)
   {
-    scheduler[i].ctx.scheduler = &scheduler[i];
-    scheduler[i].last_victim = &scheduler[i];
-    ponyint_messageq_init(&scheduler[i].mq);
-    ponyint_mpmcq_init(&scheduler[i].q);
+    scheduler_t* sched = &scheduler[i];
+
+    sched->ctx.scheduler = sched;
+    sched->last_victim = sched;
+    ponyint_messageq_init(&sched->mq);
+    ponyint_mpmcq_init(&sched->q1);
+    ponyint_mpmcq_init(&sched->q2);
+    ponyint_mpmcq_init(&sched->q3);
+
+    sched->active_q = &sched->q1;
+    sched->expired_q = &sched->q2;
+    sched->pressure_q = &sched->q3;
   }
 
   this_scheduler = &scheduler[0];
@@ -461,7 +491,7 @@ void ponyint_sched_add(pony_ctx_t* ctx, pony_actor_t* actor)
   if(ctx->scheduler != NULL)
   {
     // Add to the current scheduler thread.
-    push(ctx->scheduler, actor);
+    ponyint_mpmcq_push_single(ctx->scheduler->active_q, actor);
   } else {
     // Put on the shared mpmcq.
     ponyint_mpmcq_push(&inject, actor);

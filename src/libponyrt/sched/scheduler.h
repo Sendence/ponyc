@@ -27,6 +27,8 @@ typedef struct pony_ctx_t
   actormap_t acquire;
   bool finalising;
 
+  size_t loaded_sends;
+
   void* serialise_buffer;
   size_t serialise_size;
   ponyint_serialise_t serialise;
@@ -71,11 +73,17 @@ struct scheduler_t
   uint32_t ack_count;
 
   // These are accessed by other scheduler threads. The mpmcq_t is aligned.
-  mpmcq_t q;
+  mpmcq_t q1;
+  mpmcq_t q2;
+  mpmcq_t q3;
   messageq_t mq;
+
+  mpmcq_t* active_q;
+  mpmcq_t* expired_q;
+  mpmcq_t* pressure_q;
 };
 
-pony_ctx_t* ponyint_sched_init(uint32_t threads, bool noyield);
+pony_ctx_t* ponyint_sched_init(uint32_t threads, bool noyield, size_t batch);
 
 bool ponyint_sched_start(bool library);
 
