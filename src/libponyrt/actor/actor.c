@@ -37,10 +37,12 @@ static void unset_flag(pony_actor_t* actor, uint8_t flag)
 static bool handle_message(pony_ctx_t* ctx, pony_actor_t* actor,
   pony_msg_t* msg)
 {
+
   switch(msg->id)
   {
     case ACTORMSG_ACQUIRE:
     {
+
       pony_msgp_t* m = (pony_msgp_t*)msg;
 
       if(ponyint_gc_acquire(&actor->gc, (actorref_t*)m->p) &&
@@ -71,6 +73,7 @@ static bool handle_message(pony_ctx_t* ctx, pony_actor_t* actor,
 
     case ACTORMSG_CONF:
     {
+      //printf("CONF MESSAGE\n");
       if(has_flag(actor, FLAG_BLOCKED) && !has_flag(actor, FLAG_RC_CHANGED))
       {
         // We're blocked and our RC hasn't changed since our last block
@@ -98,6 +101,7 @@ static bool handle_message(pony_ctx_t* ctx, pony_actor_t* actor,
   }
 }
 
+
 static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
 {
   if(!ponyint_heap_startgc(&actor->heap))
@@ -121,6 +125,7 @@ static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
 #endif
 }
 
+
 bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 {
   ctx->current = actor;
@@ -139,10 +144,12 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
     {
       // If we handle an application message, try to gc.
       app++;
-      try_gc(ctx, actor);
+      //try_gc(ctx, actor);
 
-      if(app == batch)
+      if(app == batch) {
+        try_gc(ctx, actor);
         return !has_flag(actor, FLAG_UNSCHEDULED);
+      }
     }
   }
 
@@ -155,10 +162,12 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
     {
       // If we handle an application message, try to gc.
       app++;
-      try_gc(ctx, actor);
+      //try_gc(ctx, actor);
 
-      if(app == batch)
+      if(app == batch) {
+        try_gc(ctx, actor);
         return !has_flag(actor, FLAG_UNSCHEDULED);
+      }
     }
 
     // Stop handling a batch if we reach the head we found when we were

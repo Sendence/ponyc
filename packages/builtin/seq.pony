@@ -34,7 +34,7 @@ interface Seq[A]
     Removes all elements from the sequence.
     """
 
-  fun ref push(value: A): Seq[A]^
+  fun ref push(value: A, unsafe: Bool = false): Seq[A]^
     """
     Adds an element to the end of the sequence.
     """

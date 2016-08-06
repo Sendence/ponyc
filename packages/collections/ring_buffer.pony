@@ -53,7 +53,7 @@ class RingBuffer[A]
 
     _array(i and _mod)
 
-  fun ref push(value: A): RingBuffer[A]^ =>
+  fun ref push(value: A, unsafe: Bool = false): RingBuffer[A]^ =>
     """
     Add an element to the ring. If the ring is full, this will drop the oldest
     element in the ring.

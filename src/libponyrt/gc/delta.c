@@ -1,5 +1,6 @@
 #include "delta.h"
 #include "../mem/pool.h"
+#include <stdio.h>
 
 typedef struct delta_t
 {
@@ -59,6 +60,7 @@ deltamap_t* ponyint_deltamap_update(deltamap_t* map, pony_actor_t* actor,
   delta->actor = actor;
   delta->rc = rc;
 
+  if (ponyint_deltamap_size(map) == 262144) printf("DELTA MAP SIZE: %zu %p\n", ponyint_deltamap_size(map), &map);
   ponyint_deltamap_put(map, delta);
   return map;
 }

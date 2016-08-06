@@ -38,6 +38,7 @@ class val String is (Seq[U8] & Comparable[String box] & Stringable)
         (_size > 0) and
         try (data((_size + offset) - 1) == 0) else false end
       then
+        _size = _size - 1
         _alloc = data.space() - offset
         _ptr = data._cstring()._unsafe()._offset(offset)
       else
@@ -48,6 +49,14 @@ class val String is (Seq[U8] & Comparable[String box] & Stringable)
       end
     end
 
+  new iso from_iso_array(data: Array[U8] iso) =>
+    """
+    Create a string from an array, reusing the underlying data pointer if the
+    array is null terminated, or copying the data if it is not.
+    """
+    _size = data.size()
+    _alloc = data.space()
+    _ptr = (consume data)._cstring()._unsafe()._offset(0)
 
   new from_cstring(str: Pointer[U8], len: USize = 0) =>
     """
@@ -615,11 +624,11 @@ class val String is (Seq[U8] & Comparable[String box] & Stringable)
     end
     this
 
-  fun ref push(value: U8): String ref^ =>
+  fun ref push(value: U8, unsafe: Bool = false): String ref^ =>
     """
     Add a byte to the end of the string.
     """
-    reserve(_size + 1)
+    if not unsafe then reserve(_size + 1) end
     _set(_size, value)
     _size = _size + 1
     _set(_size, 0)

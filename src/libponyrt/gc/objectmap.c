@@ -5,6 +5,7 @@
 #include "../mem/pool.h"
 #include "../mem/pagemap.h"
 #include <assert.h>
+#include <stdio.h>
 
 static size_t object_hash(object_t* obj)
 {
@@ -54,6 +55,7 @@ object_t* ponyint_objectmap_getorput(objectmap_t* map, void* address,
     return obj;
 
   obj = object_alloc(address, mark);
+  if (ponyint_objectmap_size(map) == 262144) printf("OBJECT MAP SIZE: %zu %p\n", ponyint_objectmap_size(map), &map);
   ponyint_objectmap_put(map, obj);
   return obj;
 }
@@ -61,6 +63,8 @@ object_t* ponyint_objectmap_getorput(objectmap_t* map, void* address,
 object_t* ponyint_objectmap_register_final(objectmap_t* map, void* address,
   pony_final_fn final, uint32_t mark)
 {
+  if (ponyint_objectmap_size(map) == 262144) printf("objectmap SIZE rf: %zu %p\n", ponyint_objectmap_size(map), &map);
+
   object_t* obj = ponyint_objectmap_getorput(map, address, mark);
   obj->final = final;
   return obj;
@@ -83,6 +87,8 @@ size_t ponyint_objectmap_sweep(objectmap_t* map)
   size_t count = 0;
   size_t i = HASHMAP_BEGIN;
   object_t* obj;
+
+  if (ponyint_objectmap_size(map) >= 262144) printf("start OBJECT MAP SWEEP %zu %p\n", ponyint_objectmap_size(map), &map);
 
   while((obj = ponyint_objectmap_next(map, &i)) != NULL)
   {

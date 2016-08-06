@@ -7,6 +7,7 @@
 #include "../mem/pool.h"
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 static size_t actorref_hash(actorref_t* aref)
 {
@@ -37,6 +38,8 @@ object_t* ponyint_actorref_getobject(actorref_t* aref, void* address)
 object_t* ponyint_actorref_getorput(actorref_t* aref, void* address,
   uint32_t mark)
 {
+  if (ponyint_objectmap_size(&aref->map) == 262144) printf("ACTOR REF SIZE: %zu %p\n", ponyint_objectmap_size(&aref->map), &aref->map);
+
   return ponyint_objectmap_getorput(&aref->map, address, mark);
 }
 
@@ -114,7 +117,9 @@ actorref_t* ponyint_actormap_getorput(actormap_t* map, pony_actor_t* actor,
     return aref;
 
   aref = actorref_alloc(actor, mark);
+  if (ponyint_actormap_size(map) == 262144) printf("ACTOR MAP SIZE: %zu %p\n", ponyint_actormap_size(map), &map);
   ponyint_actormap_put(map, aref);
+
   return aref;
 }
 

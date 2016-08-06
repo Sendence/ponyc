@@ -144,7 +144,7 @@ class List[A] is Seq[A]
     end
     this
 
-  fun ref push(a: A): List[A]^ =>
+  fun ref push(a: A, unsafe: Bool = false): List[A]^ =>
     """
     Adds a value to the tail of the list.
     """

@@ -49,7 +49,7 @@ actor TCPConnection
   var _shutdown: Bool = false
   var _shutdown_peer: Bool = false
   var _in_sent: Bool = false
-  embed _pending: List[(ByteSeq, USize)] = _pending.create()
+  embed _pending: List[(ByteSeq, USize)] = _pending.create(100_000)
   var _read_buf: Array[U8] iso
 
   var _next_size: USize
@@ -128,9 +128,9 @@ actor TCPConnection
     """
     Write a single sequence of bytes.
     """
-    if not _closed then
+    if _connected and not _closed then
       _in_sent = true
-      write_final(_notify.sent(this, data))
+      //write_final(_notify.sent(this, data))
       _in_sent = false
     end
 
@@ -147,6 +147,7 @@ actor TCPConnection
 
       _in_sent = false
     end
+
 
   be set_notify(notify: TCPConnectionNotify iso) =>
     """
@@ -283,6 +284,7 @@ actor TCPConnection
     everything was written. On an error, close the connection. This is for
     data that has already been transformed by the notifier.
     """
+
     if not _closed then
       ifdef windows then
         try
@@ -299,19 +301,25 @@ actor TCPConnection
 
             if len < data.size() then
               // Send any remaining data later.
+              @printf[None]("pending a!!!!\n".cstring())
+
               _pending.push((data, len))
               _writeable = false
             end
           else
             // Non-graceful shutdown on error.
+                        @printf[None]("hard close!!!!\n".cstring())
+
             _hard_close()
           end
         else
           // Send later, when the socket is available for writing.
+            //@printf[None]("pending!!!!\n".cstring())
           _pending.push((data, 0))
         end
       end
     end
+
 
   fun ref _complete_writes(len: U32) =>
     """

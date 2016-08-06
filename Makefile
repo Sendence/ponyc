@@ -480,9 +480,9 @@ $($(1))/libponyrt.$(LIB_EXT): $(depends) $(ofiles)
   ifeq ($(runtime-bitcode),yes)
 $($(1))/libponyrt.bc: $(depends) $(bcfiles)
 	@echo 'Generating bitcode for libponyrt'
-	$(SILENT)llvm-link -o $$@ $(bcfiles)
+	$(SILENT)llvm-link-3.8 -o $$@ $(bcfiles)
     ifeq ($(config),release)
-	$(SILENT)opt -O3 -o $$@ $$@
+	$(SILENT)opt-3.8 -O3 -o $$@ $$@
     endif
 libponyrt: $($(1))/libponyrt.bc $($(1))/libponyrt.$(LIB_EXT)
   else

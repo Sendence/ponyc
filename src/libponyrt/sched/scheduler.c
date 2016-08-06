@@ -164,6 +164,7 @@ static bool quiescent(scheduler_t* sched, uint64_t tsc, uint64_t tsc2)
   return false;
 }
 
+
 static scheduler_t* choose_victim(scheduler_t* sched)
 {
   scheduler_t* victim = sched->last_victim;
@@ -196,6 +197,7 @@ static scheduler_t* choose_victim(scheduler_t* sched)
 
   return NULL;
 }
+
 
 /**
  * Use mpmcqs to allow stealing directly from a victim, without waiting for a

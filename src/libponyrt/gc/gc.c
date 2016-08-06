@@ -4,6 +4,7 @@
 #include "../mem/pagemap.h"
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 #define GC_ACTOR_HEAP_EQUIV 1024
 #define GC_IMMUT_HEAP_EQUIV 1024
@@ -128,6 +129,7 @@ static void send_local_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
   int mutability)
 {
   gc_t* gc = ponyint_actor_gc(ctx->current);
+  if (ponyint_objectmap_size(&gc->local) == 262144) printf("GC LOCAL SIZE send local: %zu %p\n", ponyint_objectmap_size(&gc->local), &gc->local);
   object_t* obj = ponyint_objectmap_getorput(&gc->local, p, gc->mark);
 
   if(obj->mark == gc->mark)
@@ -197,6 +199,8 @@ static void acquire_local_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
   int mutability)
 {
   gc_t* gc = ponyint_actor_gc(ctx->current);
+  if (ponyint_objectmap_size(&gc->local) == 262144) printf("GC LOCAL SIZE acquire local: %zu %p\n", ponyint_objectmap_size(&gc->local), &gc->local);
+
   object_t* obj = ponyint_objectmap_getorput(&gc->local, p, gc->mark);
 
   if(obj->mark == gc->mark)
@@ -631,6 +635,7 @@ bool ponyint_gc_acquire(gc_t* gc, actorref_t* aref)
   {
     // Add to our RC. The object may not be in our object map, if it was
     // reached through another immutable reference.
+    if (ponyint_objectmap_size(&gc->local) == 262144) printf("GC ACQUIRE SIZE: %zu %p\n", ponyint_objectmap_size(&gc->local), &gc->local);
     object_t* obj_local = ponyint_objectmap_getorput(&gc->local, obj->address,
       gc->mark);
     obj_local->rc += obj->rc;

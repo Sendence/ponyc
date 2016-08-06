@@ -214,12 +214,12 @@ class Array[A] is Seq[A]
     _size = 0
     this
 
-  fun ref push(value: A): Array[A]^ =>
+  fun ref push(value: A, unsafe: Bool = false): Array[A]^ =>
     """
     Add an element to the end of the array.
     The array is returned to allow call chaining.
     """
-    reserve(_size + 1)
+    if not unsafe then reserve(_size + 1) end
     _ptr._update(_size, consume value)
     _size = _size + 1
     this
@@ -267,7 +267,7 @@ class Array[A] is Seq[A]
 
     try
       while i < cap do
-        push(seq(i))
+        push(seq(i), true)
         i = i + 1
       end
     end
