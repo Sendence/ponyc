@@ -23,31 +23,11 @@ class val String is (Seq[U8] & Comparable[String box] & Stringable)
 
   new val from_array(data: Array[U8] val, offset: USize = 0) =>
     """
-    Create a string from an array, reusing the underlying data pointer if the
-    array is null terminated, or copying the data if it is not.
-    """
-    if offset >= data.size() then
-      _size = 0
-      _alloc = 1
-      _ptr = Pointer[U8]._alloc(_alloc)
-      _set(0, 0)
-    else
-      _size = data.size() - offset
-
-      if
-        (_size > 0) and
-        try (data((_size + offset) - 1) == 0) else false end
-      then
-        _size = _size - 1
-        _alloc = data.space() - offset
-        _ptr = data._cstring()._unsafe()._offset(offset)
-      else
-        _alloc = _size + 1
-        _ptr = Pointer[U8]._alloc(_alloc)
-        data._cstring()._offset(offset)._copy_to(_ptr, _size)
-        _set(_size, 0)
-      end
-    end
+    Create a string from an array, reusing the underlying data pointer
+    """    
+    _size = data.size()
+    _alloc = data.space()
+    _ptr = (consume data)._cstring()._unsafe()._offset(0)
 
   new iso from_iso_array(data: Array[U8] iso) =>
     """
@@ -979,6 +959,65 @@ class val String is (Seq[U8] & Comparable[String box] & Stringable)
       result.push(consume cur)
     end
 
+    consume result
+
+  fun val split_in_place(delim: String = " \t\v\f\r\n", n: USize = 0): Array[String val] iso^ =>
+    """
+    Same as split, but no new strings are allocated.
+    """
+    let result = recover Array[String] end
+
+    if _size > 0 then
+      let chars = Array[U32](delim.size())
+
+      for rune in delim.runes() do
+        chars.push(rune)
+      end
+
+      var offset = USize(0)
+      var last = USize(0)
+      var occur = USize(0)
+
+      try 
+        while offset < _size do
+          (let char, let len) = utf32(offset.isize())
+          if chars.contains(char) then
+            occur = occur + 1
+            if (n > 0) and (occur >= n) then
+              break
+            end
+
+            let size': USize = offset - last
+            let alloc': USize = size' + 1
+            let s: String val = recover
+              if size' > 0 then
+                from_cstring(_ptr._offset(last)._unsafe(), size', alloc')
+              else
+                create()
+              end
+            end
+            result.push(s)
+            last = offset + len.usize()
+          end
+
+          offset = offset + len.usize()
+        end
+
+        if last < _size then
+          let size': USize = _size - last
+          let alloc': USize = size' + 1
+          let s: String val = recover
+            if size' > 0 then
+              from_cstring(_ptr._offset(last)._unsafe(), size', alloc')
+            else
+              create()
+            end
+          end
+          result.push(s)
+        end
+      end
+
+    end
     consume result
 
   fun ref strip(s: String box = " \t\v\f\r\n"): String ref^ =>
