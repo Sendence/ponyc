@@ -146,7 +146,7 @@ sched_level_t ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor,
   ctx->current = actor;
   ctx->loaded_sends = 0;
 
-  pony_msg_t* msg;
+  pony_msg_t* msg = NULL;
   size_t app = 0;
   bool run = true;
 
