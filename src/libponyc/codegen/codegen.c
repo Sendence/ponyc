@@ -451,12 +451,12 @@ static void init_module(compile_t* c, ast_t* program, pass_opt_t* opt)
   c->filename = package_filename(package);
 
   // LLVM context and machine settings.
-  if(c->opt->library || target_is_ilp32(opt->triple))
+  if(c->opt->library || c->opt->c_abi || target_is_ilp32(opt->triple))
     c->callconv = LLVMCCallConv;
   else
     c->callconv = LLVMFastCallConv;
 
-  if(!c->opt->release || c->opt->library || c->opt->extfun)
+  if(!c->opt->release || c->opt->library || c->opt->extfun || c->opt->c_abi)
     c->linkage = LLVMExternalLinkage;
   else
     c->linkage = LLVMPrivateLinkage;

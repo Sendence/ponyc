@@ -27,6 +27,7 @@ enum
   OPT_PATHS,
   OPT_OUTPUT,
   OPT_LIBRARY,
+  OPT_CABI,
   OPT_RUNTIMEBC,
   OPT_PIC,
   OPT_DOCS,
@@ -64,6 +65,7 @@ static opt_arg_t args[] =
   {"path", 'p', OPT_ARG_REQUIRED, OPT_PATHS},
   {"output", 'o', OPT_ARG_REQUIRED, OPT_OUTPUT},
   {"library", 'l', OPT_ARG_NONE, OPT_LIBRARY},
+  {"c-abi", 'c', OPT_ARG_NONE, OPT_CABI},
   {"runtimebc", '\0', OPT_ARG_NONE, OPT_RUNTIMEBC},
   {"pic", '\0', OPT_ARG_NONE, OPT_PIC},
   {"docs", 'g', OPT_ARG_NONE, OPT_DOCS},
@@ -111,6 +113,7 @@ static void usage()
     "  --output, -o    Write output to this directory.\n"
     "    =path         Defaults to the current directory.\n"
     "  --library, -l   Generate a C-API compatible static library.\n"
+    "  --c-abi, -c     Generate a C-API compatible executable.\n"
     "  --runtimebc     Compile with the LLVM bitcode file for the runtime.\n"
     "  --pic           Compile using position independent code.\n"
     "  --docs, -g      Generate code documentation.\n"
@@ -269,6 +272,7 @@ int main(int argc, char* argv[])
       case OPT_PATHS: package_add_paths(s.arg_val, &opt); break;
       case OPT_OUTPUT: opt.output = s.arg_val; break;
       case OPT_LIBRARY: opt.library = true; break;
+      case OPT_CABI: opt.c_abi = true; break;
       case OPT_RUNTIMEBC: opt.runtimebc = true; break;
       case OPT_PIC: opt.pic = true; break;
       case OPT_DOCS: opt.docs = true; break;
