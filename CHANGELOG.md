@@ -48,6 +48,9 @@ All notable changes to the Pony compiler and standard library will be documented
 - Fix issue with creating hex and octal strings if precision was specified.
 - Correctly parses Windows 10 SDK versions, and includes new UCRT library when linking with Windows 10 SDK.
 - Performance of Array.append and Array.concat (no unnecessary calls to push).
+- Performance of Map.upsert and Map.update (don't replace existing keys)
+- Segmentation fault from allocating zero-sized struct.
+- Segmentation fault from serialising zero-sized array.
 
 ### Added
 
@@ -100,7 +103,9 @@ All notable changes to the Pony compiler and standard library will be documented
 - `trim` and `trim_in_place` methods for `Array` and `String`.
 - `is_null_terminated` and `null_terminated` methods for `String`.
 - `from_iso_array` constructor for `String`.
+- `from_iso_array` constructor on `String`.
 - `Sort` primitive
+- PonyBench package
 
 ### Changed
 
@@ -125,6 +130,7 @@ All notable changes to the Pony compiler and standard library will be documented
 - Embedded fields can now be constructed from complex expressions containing constructors
 - Sendable members of non-sendable objects can be used in recover expressions in certain cases.
 - ProcessNotify functions are passed a reference to ProcessMonitor.
+- The constructor of `Options` doesn't require an `Env` anymore but just a simple `String` array.
 
 ## [0.2.1] - 2015-10-06
 

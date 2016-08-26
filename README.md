@@ -108,6 +108,7 @@ Invoke-WebRequest -Uri https://dl.bintray.com/pony-language/ponyc-win/ponyc-VERS
 .\ponyc-VERSION\ponyc\bin\ponyc.exe --version
 ```
 
+Windows 10 users will need to install the Windows 10 SDK in order to build programs with ponyc. It can be downloaded [from Microsoft](https://developer.microsoft.com/en-us/windows/downloads/windows-10-sdk).
 
 ## Mac OS X using [Homebrew](http://brew.sh)
 
@@ -157,6 +158,18 @@ To build ponyc and compile helloworld:
 ```bash
 $ make config=release
 $ ./build/release/ponyc examples/helloworld
+```
+
+If you get errors like
+
+```bash
+/usr/bin/ld.gold: error: ./fb.o: requires dynamic R_X86_64_32 reloc against 'Array_String_val_Trace' which may overflow at runtime; recompile with -fPIC
+```
+
+try running `ponyc` with the `--pic` flag.
+
+```bash
+$ ./build/release/ponyc --pic examples/helloworld
 ```
 
 ### Debian Jessie
