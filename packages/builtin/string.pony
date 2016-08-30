@@ -72,14 +72,6 @@ actor Main
     """
     _size = data.size()
     _alloc = data.space()
-    _ptr = (consume data)._cstring()._unsafe()._offset(0)
-
-  new iso from_iso_array(data: Array[U8] iso) =>
-    """
-    Create a string from an array, reusing the underlying data pointer
-    """
-    _size = data.size()
-    _alloc = data.space()
     _ptr = (consume data)._cstring()._unsafe()
 
   new from_cstring(str: Pointer[U8], len: USize = 0, alloc: USize = 0) =>
