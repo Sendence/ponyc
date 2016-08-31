@@ -5,10 +5,16 @@ All notable changes to the Pony compiler and standard library will be documented
 ## [unreleased] - unreleased
 
 ### Fixed
+- Make sure all scheduler threads are pinned to CPU cores; on Linux/FreeBSD this wasn't the case for the main thread.
+- Account for both hyperthreading and NUMA locality when assigning scheduler threads to cores on Linux.
 
 ### Added
+- `--ponypinasio` runtime option for pinning asio thread to a cpu core.
+- `--ponynopin` runtime option for not pinning any threads at all.
 
 ### Changed
+
+- Path.base now provides option to omit the file extension from the result.
 
 ## [0.3.0] - 2016-08-26
 
@@ -59,7 +65,6 @@ All notable changes to the Pony compiler and standard library will be documented
 - Performance of Map.upsert and Map.update (don't replace existing keys)
 - Segmentation fault from allocating zero-sized struct.
 - Segmentation fault from serialising zero-sized array.
-- Make sure all scheduler threads are pinned to CPU cores; on Linux/FreeBSD this wasn't the case for the main thread.
 - Assertion failure from type-checking in invalid programs.
 - Make the offset parameter of String.rfind inclusive of the given index.
 
@@ -117,7 +122,6 @@ All notable changes to the Pony compiler and standard library will be documented
 - `from_iso_array` constructor on `String`.
 - `Sort` primitive
 - PonyBench package
-- `--ponypinasio` runtime option for pinning asio thread to a cpu core.
 
 ### Changed
 
