@@ -24,8 +24,14 @@ RULE(module,
   HAS_DATA  // source_t
   OPTIONAL(string)
   ZERO_OR_MORE(use)
+  ZERO_OR_MORE(export)
   ZERO_OR_MORE(class_def),
   TK_MODULE);
+
+RULE(export,
+  HAS_TYPE(type)
+  CHILD(type),
+  TK_EXPORT);
 
 RULE(use,
   HAS_DATA  // Included package (unaliased use package commands only)

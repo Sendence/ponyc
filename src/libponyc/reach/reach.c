@@ -15,12 +15,13 @@ DEFINE_STACK(reach_method_stack, reach_method_stack_t,
   reach_method_t);
 
 static reach_method_t* add_rmethod(reach_t* r, reach_type_t* t,
-  reach_method_name_t* n, token_id cap, ast_t* typeargs, pass_opt_t* opt);
+  reach_method_name_t* n, token_id cap, ast_t* typeargs, pass_opt_t* opt,
+  bool exported, const char* exported_name);
 
 static reach_type_t* add_type(reach_t* r, ast_t* type, pass_opt_t* opt);
 
 static void reachable_method(reach_t* r, ast_t* type, const char* name,
-  ast_t* typeargs, pass_opt_t* opt);
+  ast_t* typeargs, pass_opt_t* opt, bool exported, const char* exported_name);
 
 static void reachable_expr(reach_t* r, ast_t* ast, pass_opt_t* opt);
 
@@ -211,7 +212,7 @@ static void add_rmethod_to_subtype(reach_t* r, reach_type_t* t,
 {
   // Add the method to the type if it isn't already there.
   reach_method_name_t* n2 = add_method_name(t, n->name);
-  add_rmethod(r, t, n2, m->cap, m->typeargs, opt);
+  add_rmethod(r, t, n2, m->cap, m->typeargs, opt, false, NULL);
 
   // Add this mangling to the type if it isn't already there.
   reach_method_t* mangled = reach_mangled_get(&n2->r_mangled, m);
@@ -298,7 +299,8 @@ static void add_rmethod_to_subtypes(reach_t* r, reach_type_t* t,
 }
 
 static reach_method_t* add_rmethod(reach_t* r, reach_type_t* t,
-  reach_method_name_t* n, token_id cap, ast_t* typeargs, pass_opt_t* opt)
+  reach_method_name_t* n, token_id cap, ast_t* typeargs, pass_opt_t* opt,
+  bool exported, const char* exported_name)
 {
   const char* name = genname_fun(cap, n->name, typeargs);
   reach_method_t* m = reach_rmethod(n, name);
@@ -312,7 +314,13 @@ static reach_method_t* add_rmethod(reach_t* r, reach_type_t* t,
   m->cap = cap;
   m->typeargs = ast_dup(typeargs);
   m->vtable_index = (uint32_t)-1;
-
+  m->exported = exported;
+  if(exported) {
+    if(exported_name)
+      m->exported_name = exported_name;
+    else
+      m->exported_name = genname_wrapper(t->name, n->name);
+  } 
   ast_t* r_ast = set_cap_and_ephemeral(t->ast, cap, TK_NONE);
   ast_t* fun = lookup(NULL, NULL, r_ast, n->name);
   ast_free_unattached(r_ast);
@@ -513,7 +521,7 @@ static void add_special(reach_t* r, reach_type_t* t, ast_t* type,
       case TK_FUN:
       case TK_BE:
       {
-        reachable_method(r, t->ast, special, NULL, opt);
+        reachable_method(r, t->ast, special, NULL, opt, false, NULL);
         ast_free_unattached(find);
         break;
       }
@@ -757,7 +765,8 @@ static void reachable_pattern(reach_t* r, ast_t* ast, pass_opt_t* opt)
 
     default:
     {
-      reachable_method(r, ast_type(ast), stringtab("eq"), NULL, opt);
+      reachable_method(r, ast_type(ast), stringtab("eq"), NULL, opt, false,
+        NULL);
       reachable_expr(r, ast, opt);
       break;
     }
@@ -786,7 +795,7 @@ static void reachable_fun(reach_t* r, ast_t* ast, pass_opt_t* opt)
   ast_t* type = ast_type(receiver);
   const char* method_name = ast_name(method);
 
-  reachable_method(r, type, method_name, typeargs, opt);
+  reachable_method(r, type, method_name, typeargs, opt, false, NULL);
 }
 
 static void reachable_addressof(reach_t* r, ast_t* ast, pass_opt_t* opt)
@@ -859,7 +868,7 @@ static void reachable_expr(reach_t* r, ast_t* ast, pass_opt_t* opt)
       ast_t* type = ast_type(ast);
 
       if(type != NULL)
-        reachable_method(r, type, stringtab("create"), NULL, opt);
+        reachable_method(r, type, stringtab("create"), NULL, opt, false, NULL);
       break;
     }
 
@@ -945,11 +954,12 @@ static void reachable_expr(reach_t* r, ast_t* ast, pass_opt_t* opt)
 }
 
 static void reachable_method(reach_t* r, ast_t* type, const char* name,
-  ast_t* typeargs, pass_opt_t* opt)
+  ast_t* typeargs, pass_opt_t* opt, bool exported, const char* exported_name)
 {
   reach_type_t* t = add_type(r, type, opt);
   reach_method_name_t* n = add_method_name(t, name);
-  reach_method_t* m = add_rmethod(r, t, n, n->cap, typeargs, opt);
+  reach_method_t* m = add_rmethod(r, t, n, n->cap, typeargs, opt, exported,
+    exported_name);
 
   if((n->id == TK_FUN) && ((n->cap == TK_BOX) || (n->cap == TK_TAG)))
   {
@@ -960,7 +970,7 @@ static void reachable_method(reach_t* r, ast_t* type, const char* name,
 
     if(t->underlying != TK_PRIMITIVE)
     {
-      m2 = add_rmethod(r, t, n, TK_REF, typeargs, opt);
+      m2 = add_rmethod(r, t, n, TK_REF, typeargs, opt, false, NULL);
 
       if(subordinate)
       {
@@ -970,7 +980,7 @@ static void reachable_method(reach_t* r, ast_t* type, const char* name,
       }
     }
 
-    m2 = add_rmethod(r, t, n, TK_VAL, typeargs, opt);
+    m2 = add_rmethod(r, t, n, TK_VAL, typeargs, opt, false, NULL);
 
     if(subordinate)
     {
@@ -981,7 +991,7 @@ static void reachable_method(reach_t* r, ast_t* type, const char* name,
 
     if(n->cap == TK_TAG)
     {
-      m2 = add_rmethod(r, t, n, TK_BOX, typeargs, opt);
+      m2 = add_rmethod(r, t, n, TK_BOX, typeargs, opt, false, NULL);
       m2->intrinsic = true;
       m->subordinate = m2;
       m = m2;
@@ -1022,7 +1032,14 @@ void reach_free(reach_t* r)
 void reach(reach_t* r, ast_t* type, const char* name, ast_t* typeargs,
   pass_opt_t* opt)
 {
-  reachable_method(r, type, name, typeargs, opt);
+  reachable_method(r, type, name, typeargs, opt, false, NULL);
+  handle_stack(r, opt);
+}
+
+void reach_export(reach_t* r, ast_t* type, const char* name, ast_t* typeargs,
+  pass_opt_t* opt, const char* exported_name)
+{
+  reachable_method(r, type, name, typeargs, opt, true, exported_name);
   handle_stack(r, opt);
 }
 

@@ -839,6 +839,21 @@ static ast_result_t syntax_use(pass_opt_t* opt, ast_t* ast)
 }
 
 
+static ast_result_t syntax_export(pass_opt_t* opt, ast_t* ast)
+{
+  assert(ast != NULL);
+  AST_GET_CHILDREN(ast, type);
+
+  if(ast_id(type) == TK_NONE) {
+    ast_error(opt->check.errors, type,
+      "export must export a valid type");
+    return AST_ERROR;
+  }
+
+  return AST_OK;
+}
+
+
 static ast_result_t syntax_lambda_capture(pass_opt_t* opt, ast_t* ast)
 {
   AST_GET_CHILDREN(ast, name, type, value);
@@ -1092,6 +1107,7 @@ ast_result_t pass_syntax(ast_t** astp, pass_opt_t* options)
     case TK_TYPEPARAM:  r = syntax_type_param(options, ast); break;
     case TK_IFDEF:      r = syntax_ifdef(options, ast); break;
     case TK_USE:        r = syntax_use(options, ast); break;
+    case TK_EXPORT:     r = syntax_export(options, ast); break;
     case TK_LAMBDACAPTURE:
                         r = syntax_lambda_capture(options, ast); break;
     case TK_COMPILE_INTRINSIC:

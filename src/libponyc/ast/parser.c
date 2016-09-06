@@ -1023,6 +1023,14 @@ DEF(use_uri);
   TOKEN(NULL, TK_STRING);
   DONE();
 
+// EXPORT type
+DEF(export);
+  RESTART(TK_TYPE, TK_INTERFACE, TK_TRAIT, TK_PRIMITIVE, TK_STRUCT,
+    TK_CLASS, TK_ACTOR, TK_EXPORT);
+  TOKEN(NULL, TK_EXPORT);
+  RULE("export type", type);
+  DONE();
+
 // AT (ID | STRING) typeparams (LPAREN | LPAREN_NEW) [params] RPAREN [QUESTION]
 DEF(use_ffi);
   TOKEN(NULL, TK_AT);
@@ -1047,7 +1055,7 @@ DEF(use_name);
 // USE [ID ASSIGN] (STRING | USE_FFI) [IF infix]
 DEF(use);
   RESTART(TK_USE, TK_TYPE, TK_INTERFACE, TK_TRAIT, TK_PRIMITIVE, TK_STRUCT,
-    TK_CLASS, TK_ACTOR);
+    TK_CLASS, TK_ACTOR, TK_EXPORT);
   TOKEN(NULL, TK_USE);
   OPT RULE("name", use_name);
   RULE("specifier", use_uri, use_ffi);
@@ -1060,6 +1068,7 @@ DEF(module);
   SCOPE();
   OPT_NO_DFLT TOKEN("package docstring", TK_STRING);
   SEQ("use command", use);
+  SEQ("export command", export);
   SEQ("type, interface, trait, primitive, class or actor definition",
     class_def);
   SKIP("type, interface, trait, primitive, class, actor, member or method",

@@ -38,6 +38,8 @@ const char* genname_box(const char* name);
 
 const char* genname_unbox(const char* name);
 
+const char* genname_wrapper(const char* t_name, const char* n_name);
+
 PONY_EXTERN_C_END
 
 #endif
