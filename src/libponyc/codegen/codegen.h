@@ -37,6 +37,7 @@ void LLVMSetCallInaccessibleMemOrArgMemOnly(LLVMValueRef inst);
 LLVMValueRef LLVMConstNaN(LLVMTypeRef type);
 LLVMModuleRef LLVMParseIRFileInContext(LLVMContextRef ctx, const char* file);
 void LLVMSetMetadataStr(LLVMValueRef val, const char* str, LLVMValueRef node);
+#define LLVMOptimizeNoneAttribute (uint64_t)(1ULL << 42)
 
 // Intrinsics.
 LLVMValueRef LLVMMemcpy(LLVMModuleRef module, bool ilp32);
@@ -53,6 +54,9 @@ LLVMValueRef LLVMLifetimeEnd(LLVMModuleRef module);
     decl = LLVMCreateEnumAttribute(c->context, decl##_id, val); \
   }
 #endif
+
+LLVMValueRef LLVMInvariantStart(LLVMModuleRef module);
+void LLVMAddFunctionAttr2(LLVMValueRef func, uint64_t attr);
 
 #define GEN_NOVALUE ((LLVMValueRef)1)
 

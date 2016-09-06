@@ -108,6 +108,7 @@ static const lextoken_t keywords[] =
   { "compile_intrinsic", TK_COMPILE_INTRINSIC },
 
   { "use", TK_USE },
+  { "export", TK_EXPORT },
   { "type", TK_TYPE },
   { "interface", TK_INTERFACE },
   { "trait", TK_TRAIT },
