@@ -186,3 +186,10 @@ const char* genname_unbox(const char* name)
 {
   return stringtab_two(name, "Unbox");
 }
+
+const char* genname_wrapper(const char* t_name, const char* n_name)
+{
+  printbuf_t* buf = printbuf_new();
+  printbuf(buf, "%s_%s", t_name, n_name);
+  return stringtab_buf(buf);
+}

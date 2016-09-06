@@ -29,6 +29,7 @@ struct reach_method_t
   const char* name;
   const char* mangled_name;
   const char* full_name;
+  const char* exported_name;
 
   token_id cap;
   ast_t* typeargs;
@@ -54,6 +55,8 @@ struct reach_method_t
   size_t param_count;
   reach_param_t* params;
   reach_type_t* result;
+  bool exported;
+  LLVMValueRef wrapper;
 };
 
 struct reach_method_name_t
@@ -135,6 +138,9 @@ void reach_free(reach_t* r);
  */
 void reach(reach_t* r, ast_t* type, const char* name, ast_t* typeargs,
   pass_opt_t* opt);
+
+void reach_export(reach_t* r, ast_t* type, const char* name, ast_t* typeargs,
+  pass_opt_t* opt, const char* exported_name);
 
 reach_type_t* reach_type(reach_t* r, ast_t* type);
 

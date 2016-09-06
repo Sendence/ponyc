@@ -290,6 +290,8 @@ All notable changes to the Pony compiler and standard library will be documented
 - `from_iso_array` constructor on `String`.
 - `Sort` primitive
 - PonyBench package
+- Support for exporting of C functions
+
 
 ### Changed
 
