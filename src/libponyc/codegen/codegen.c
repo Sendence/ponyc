@@ -894,22 +894,18 @@ bool codegen(ast_t* program, pass_opt_t* opt)
   init_runtime(&c);
   genprim_reachable_init(&c, program);
 
-  //
-  // this should generate the file if the export flag is there,
-  //
-  bool ok = true;
-  if(c.opt->library) 
-    ok = genexport(&c, program);
-  else 
-    ok = genexe(&c, program);
+  bool ok;
   
-  //
-  // regardless if a library or executable,
-  // figure out if I have some exported headers
-  //
-  if ( c.opt->export_methods ) 
-  {  
-    ok &=genheader(&c);
+  if(c.opt->library)
+    ok = genlib(&c, program);
+  else {
+    if (c.opt->export_methods) {
+      ok = genexport(&c, program);
+      ok &= genheader(&c);
+    }
+    else
+      ok = true;
+    ok &= genexe(&c, program);
   }
 
   codegen_cleanup(&c);
