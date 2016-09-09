@@ -171,7 +171,7 @@ bool genlib(compile_t* c, ast_t* program)
 {
   if(!reachable_actors(c, program) ||
     !gentypes(c) ||
-    !genheader(c)
+    !genheader(c, false)
     )
     return false;
 
