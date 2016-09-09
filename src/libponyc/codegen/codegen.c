@@ -927,7 +927,7 @@ bool codegen(ast_t* program, pass_opt_t* opt)
 
     if (c.opt->export_methods) {
       ok = genexport(&c, program);
-      ok &= genheader(&c);
+      ok &= genheader(&c, true);
     }
     else
       ok = true;
