@@ -210,7 +210,71 @@ static void print_methods(compile_t* c, reach_type_t* t, printbuf_t* buf)
   }
 }
 
-static void print_types(compile_t* c, FILE* fp, printbuf_t* buf)
+static void print_exported_method(compile_t* c, printbuf_t* buf, reach_type_t* t,
+  reach_method_t* m)
+{
+  if(!emit_fun(m->r_fun))
+    return;
+
+  AST_GET_CHILDREN(m->r_fun, cap, id, typeparams, params, rtype, can_error,
+    body, docstring);
+
+  // Print the docstring if we have one.
+  if(ast_id(docstring) == TK_STRING)
+  {
+    printbuf(buf,
+      "/*\n"
+      "%s"
+      "*/\n",
+      ast_name(docstring)
+      );
+  }
+
+  // Print the function signature.
+  print_type_name(c, buf, rtype);
+  printbuf(buf, " %s", m->exported_name);
+
+  switch(ast_id(m->r_fun))
+  {
+    case TK_NEW:
+    case TK_BE:
+    {
+      ast_t* def = (ast_t*)ast_data(t->ast);
+
+      if(ast_id(def) == TK_ACTOR)
+        printbuf(buf, "__send");
+
+      break;
+    }
+
+    default: {}
+  }
+
+  printbuf(buf, "(");
+  print_type_name(c, buf, t->ast);
+  printbuf(buf, " self");
+  print_params(c, buf, params);
+  printbuf(buf, ");\n\n");
+}
+
+static void print_exported_methods(compile_t* c, reach_type_t* t,
+  printbuf_t* buf)
+{
+  size_t i = HASHMAP_BEGIN;
+  reach_method_name_t* n;
+
+  while((n = reach_method_names_next(&t->methods, &i)) != NULL)
+  {
+    size_t j = HASHMAP_BEGIN;
+    reach_method_t* m;
+
+    while((m = reach_methods_next(&n->r_methods, &j)) != NULL)
+      if(m->exported == true)
+        print_exported_method(c, buf, t, m);
+  }
+}
+
+static void print_types(compile_t* c, FILE* fp, printbuf_t* buf, bool exported)
 {
   size_t i = HASHMAP_BEGIN;
   reach_type_t* t;
@@ -242,11 +306,14 @@ static void print_types(compile_t* c, FILE* fp, printbuf_t* buf)
         );
     }
 
-    print_methods(c, t, buf);
+    if (exported)
+      print_exported_methods(c, t, buf);
+    else
+      print_methods(c, t, buf);
   }
 }
 
-bool genheader(compile_t* c)
+bool genheader(compile_t* c, bool exported)
 {
   // Open a header file.
   const char* file_h =
@@ -283,7 +350,7 @@ bool genheader(compile_t* c)
     );
 
   printbuf_t* buf = printbuf_new();
-  print_types(c, fp, buf);
+  print_types(c, fp, buf, exported);
   fwrite(buf->m, 1, buf->offset, fp);
   printbuf_free(buf);
 
