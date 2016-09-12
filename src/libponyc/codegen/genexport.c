@@ -25,11 +25,9 @@ static bool exported_methods(compile_t* c, ast_t* ast)
         AST_GET_CHILDREN(member, cap, m_id, typeparams);
 
         // Mark all non-polymorphic methods as reachable.
-        if(ast_id(typeparams) == TK_NONE) {
+        if(ast_id(typeparams) == TK_NONE)
           reach_export(c->reach, type, ast_name(m_id), NULL, c->opt, NULL);
-          if(c->opt->verbosity >= VERBOSITY_INFO)
-            fprintf(stderr, "  Exporting fun\n");
-        }
+
         break;
       }
 
@@ -45,8 +43,6 @@ static bool exported_methods(compile_t* c, ast_t* ast)
 
 static bool exported_classes(compile_t* c, ast_t* program)
 {
-  errors_t* errors = c->opt->check.errors;
-
   if(c->opt->verbosity >= VERBOSITY_INFO)
     fprintf(stderr, " Export reachability\n");
 
@@ -65,9 +61,6 @@ static bool exported_classes(compile_t* c, ast_t* program)
       {
         if(ast_id(entity) == TK_EXPORT)
         {
-          if(c->opt->verbosity >= VERBOSITY_INFO)
-            fprintf(stderr, " Exporting ... \n");
-
           exported_methods(c, entity);
 
           found = true;
@@ -82,14 +75,8 @@ static bool exported_classes(compile_t* c, ast_t* program)
     package = ast_sibling(package);
   }
 
-  if(!found)
-  {
-    errorf(errors, NULL, "No exports found in '%s'", c->filename);
-    return false;
-  }
-
   if(c->opt->verbosity >= VERBOSITY_INFO)
-    fprintf(stderr, " Selector painting\n");
+    fprintf(stderr, " Export selector painting\n");
   paint(&c->reach->types);
 
   return true;

@@ -210,15 +210,6 @@ static void make_prototype(compile_t* c, reach_type_t* t,
     m->func = codegen_addfun(c, m->full_name, m->func_type);
     genfun_param_attrs(c, t, m, m->func);
     make_function_debug(c, t, m, m->func);
-
-    /* if(m->exported) { */
-    /*   printf("generating prototype for '%s'\n", m->exported_name); */
-    /*   m->wrapper = codegen_addfun(c, m->exported_name, m->func_type); */
-    /*   genfun_param_attrs(t, m, m->wrapper); */
-    /*   make_function_debug(c, t, m, m->wrapper); */
-    /*   LLVMSetFunctionCallConv(m->wrapper, LLVMCCallConv); */
-    /*   LLVMSetLinkage(m->wrapper, LLVMExternalLinkage); */
-    /* } */
   }
 
   if(n->name == c->str__final)
