@@ -906,13 +906,12 @@ bool codegen(ast_t* program, pass_opt_t* opt)
   if(c.opt->library)
     ok = genlib(&c, program);
   else {
+    ok = genexport(&c, program);
+    ok &= genexe(&c, program);
+
     if (c.opt->export_methods) {
-      ok = genexport(&c, program);
       ok &= genheader(&c, true);
     }
-    else
-      ok = true;
-    ok &= genexe(&c, program);
   }
 
   codegen_cleanup(&c);
