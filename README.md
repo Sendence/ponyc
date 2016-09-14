@@ -374,8 +374,6 @@ $ make config=release LTO_PLUGIN=/usr/lib/LLVMgold.so
 
 Refer to your compiler documentation for the plugin to use in your case.
 
-LTO is enabled by default on OSX.
-
 ## VirtualBox
 
 Pony binaries can trigger illegal instruction errors under VirtualBox 4.x, for at least the x86_64 platform and possibly others.
