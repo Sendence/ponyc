@@ -7,6 +7,7 @@ All notable changes to the Pony compiler and standard library will be documented
 ### Fixed
 
 ### Added
+- Improved error handling for `files` package.
 
 ### Changed
 
