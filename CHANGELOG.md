@@ -5,11 +5,23 @@ All notable changes to the Pony compiler and standard library will be documented
 ## [unreleased] - unreleased
 
 ### Fixed
+- Incorrect build number generated on Windows when building from non-git directory.
 
 ### Added
 - Improved error handling for `files` package.
 
 ### Changed
+
+## [0.3.2] - 2016-09-18
+
+### Fixed
+- The `ponyc` version is now consistently set from the VERSION file.
+- Stop generating `llvm.invariant.load` intrinsic for "let" references, as these don't necessarily match the semantics of that intrinsic.
+
+### Changed
+- The `setversion` and `release` commands have been removed from `Makefile`.
+- LTO is again enabled by default on OSX
+- make now builds a `release` rather than `debug` build by default
 
 ## [0.3.1] - 2016-09-14
 

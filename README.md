@@ -2,9 +2,7 @@
 
 Need help? Not to worry, we have you covered.
 
-We have a couple resources designed to help you learn, we suggest starting with
-the tutorial and from there, moving on to the Pony Patterns book. Additionally,
-standard library documentation is available online.
+We have a couple resources designed to help you learn, we suggest starting with the tutorial and from there, moving on to the Pony Patterns book. Additionally, standard library documentation is available online.
 
 * [Tutorial](http://tutorial.ponylang.org).
 * [Pony Patterns](http://patterns.ponylang.org) cookbook is in progress
@@ -86,11 +84,13 @@ yum install ponyc-master
 For Ubuntu or Debian Linux, the `master` and `release` branches are packaged and availabe on Bintray ([pony-language/ponyc-debian](https://bintray.com/pony-language/ponyc-debian)).
 
 To install release builds via Apt:
+
 ```bash
 echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
 
 sudo apt-get install ponyc-release
 ```
+
 
 Or, for master builds:
 ```
@@ -112,10 +112,6 @@ Windows 10 users will need to install the Windows 10 SDK in order to build progr
 
 ## Mac OS X using [Homebrew](http://brew.sh)
 
-The homebrew version is currently woefully out of date. We are transitioning to
-a new release system that will keep homebrew up to date. For now, please build
-from source.
-
 ```bash
 $ brew update
 $ brew install ponyc
@@ -134,11 +130,7 @@ $ layman -a stefantalpalaru
 $ emerge dev-lang/pony
 ```
 
-A live ebuild is also available in the
-[overlay](https://github.com/stefantalpalaru/gentoo-overlay)
-(dev-lang/pony-9999) and for Vim users there's app-vim/pony-syntax.
-
-
+A live ebuild is also available in the [overlay](https://github.com/stefantalpalaru/gentoo-overlay) (dev-lang/pony-9999) and for Vim users there's app-vim/pony-syntax.
 
 # Building ponyc from source
 

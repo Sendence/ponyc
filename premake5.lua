@@ -126,10 +126,11 @@
       buildoptions "/PROFILE"
 
     configuration "vs*"
-      local version, exitcode = os.outputof("git describe --tags --always")
+      local version = os.outputof("type VERSION")
 
-      if exitcode ~= 0 then
-        version = os.outputof("type VERSION")
+      local build, exitcode = os.outputof("git rev-parse --short HEAD")
+      if exitcode == 0 then
+        version = version .. "-" .. build
       end
 
       debugdir "."

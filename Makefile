@@ -36,12 +36,19 @@ else
   endif
 endif
 
+ifndef lto
+  ifeq ($(UNAME_S),Darwin)
+  	# turn lto on for OSX if user hasn't specified a value
+   	lto := yes
+   endif
+endif
+
 ifdef LTO_PLUGIN
   lto := yes
 endif
 
-# Default settings (silent debug build).
-config ?= debug
+# Default settings (silent release build).
+config ?= release
 arch ?= native
 bits ?= $(shell getconf LONG_BIT)
 
@@ -52,11 +59,9 @@ else
 endif
 
 ifneq ($(wildcard .git),)
-tag := $(shell git describe --tags --always)
-git := yes
+  tag := $(shell cat VERSION)-$(shell git rev-parse --short HEAD)
 else
-tag := $(shell cat VERSION)
-git := no
+  tag := $(shell cat VERSION)
 endif
 
 # package_name, _version, and _iteration can be overriden by Travis or AppVeyor
@@ -440,7 +445,7 @@ define CONFIGURE_COMPILER
     compiler := $(CC)
     flags := $(ALL_CFLAGS) $(CFLAGS)
   endif
-  
+
   ifeq ($(suffix $(1)),.bc)
     compiler := $(CC)
     flags := $(ALL_CFLAGS) $(CFLAGS)
@@ -549,32 +554,6 @@ endef
 
 $(foreach target,$(targets),$(eval $(call EXPAND_COMMAND,$(target))))
 
-define EXPAND_RELEASE
-$(eval branch := $(shell git symbolic-ref HEAD | sed -e 's,.*/\(.*\),\1,'))
-ifneq ($(branch),master)
-prerelease:
-	$$(error "Releases not allowed on $(branch) branch.")
-else
-ifndef version
-prerelease:
-	$$(error "No version number specified.")
-else
-$(eval tag := $(version))
-$(eval unstaged := $(shell git status --porcelain 2>/dev/null | wc -l))
-ifneq ($(unstaged),0)
-prerelease:
-	$$(error "Detected unstaged changes. Release aborted")
-else
-prerelease: libponyc libponyrt ponyc
-	@while [ -z "$$$$CONTINUE" ]; do \
-	read -r -p "New version number: $(tag). Are you sure? [y/N]: " CONTINUE; \
-	done ; \
-	[ $$$$CONTINUE = "y" ] || [ $$$$CONTINUE = "Y" ] || (echo "Release aborted."; exit 1;)
-	@echo "Releasing ponyc v$(tag)."
-endif
-endif
-endif
-endef
 
 define EXPAND_INSTALL
 install: libponyc libponyrt ponyc
@@ -643,25 +622,6 @@ test-ci: all
 	@PONYPATH=. $(PONY_BUILD_DIR)/ponyc -d -s examples
 	@./examples1
 	@rm examples1
-
-ifeq ($(git),yes)
-setversion:
-	@echo $(tag) > VERSION
-
-$(eval $(call EXPAND_RELEASE))
-
-release: prerelease setversion
-	$(SILENT)git add VERSION
-	$(SILENT)git commit -m "Releasing version $(tag)"
-	$(SILENT)git tag $(tag)
-	$(SILENT)git push
-	$(SILENT)git push --tags
-	$(SILENT)git checkout release
-	$(SILENT)git pull
-	$(SILENT)git merge master
-	$(SILENT)git push
-	$(SILENT)git checkout $(branch)
-endif
 
 # Note: linux only
 # FIXME: why is $(branch) empty?
