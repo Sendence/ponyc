@@ -87,7 +87,7 @@ To install release builds via Apt:
 
 ```bash
 echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
-
+sudo apt-get update
 sudo apt-get install ponyc-release
 ```
 
@@ -137,6 +137,13 @@ A live ebuild is also available in the [overlay](https://github.com/stefantalpal
 Pony requires LLVM 3.6, 3.7 or 3.8. Please note that **LLVM 3.7.0 does not work**. If you are using LLVM 3.7.x, you need to use 3.7.1. If you are using LLVM 3.6.x, make sure to use 3.6.2.
 
 ## Building on Linux
+
+Get Pony-Sources from Github (More Information about Set Up Git https://help.github.com/articles/set-up-git/ ):
+```bash
+$ sudo apt install git
+$ git clone git://github.com/ponylang/ponyc
+```
+
 [![Linux and OS X](https://travis-ci.org/ponylang/ponyc.svg?branch=master)](https://travis-ci.org/ponylang/ponyc)
 
 ### Arch
@@ -148,7 +155,7 @@ pacman -S llvm make ncurses openssl pcre2 zlib
 To build ponyc and compile helloworld:
 
 ```bash
-$ make config=release
+$ make
 $ ./build/release/ponyc examples/helloworld
 ```
 
@@ -193,11 +200,13 @@ $ make
 $ sudo make install
 ```
 
-To build ponyc and compile helloworld:
+To build ponyc, compile and run helloworld:
 
 ```bash
-$ make config=release
+$ cd ~/ponyc/
+$ make
 $ ./build/release/ponyc examples/helloworld
+$ ./helloworld
 ```
 
 ### Ubuntu (14.04, 15.10, 16.04)
@@ -220,11 +229,13 @@ $ make
 $ sudo make install
 ```
 
-To build ponyc and compile helloworld:
+To build ponyc, compile and run helloworld:
 
 ```bash
-$ make config=release
+$ cd ~/ponyc/
+$ make
 $ ./build/release/ponyc examples/helloworld
+$ ./helloworld
 ```
 
 ### Other Linux distributions
@@ -248,11 +259,13 @@ $ make
 $ sudo make install
 ```
 
-Finally to build ponyc and compile the hello world app:
+Finally to build ponyc, compile and run the hello world app:
 
 ```bash
-$ make config=release
+$ cd ~/ponyc/
+$ make
 $ ./build/release/ponyc examples/helloworld
+$ ./helloworld
 ```
 
 ## Building on FreeBSD
@@ -269,7 +282,7 @@ $ sudo pkg install libunwind
 This will build ponyc and compile helloworld:
 
 ```bash
-$ gmake config=release
+$ gmake
 $ ./build/release/ponyc examples/helloworld
 ```
 
@@ -297,7 +310,7 @@ $ sudo port select --set llvm mp-llvm-3.8
 Then launch the build with Make:
 
 ```bash
-$ make config=release
+$ make
 $ ./build/release/ponyc examples/helloworld
 ```
 
@@ -355,13 +368,13 @@ $ .\stdlib
 You can enable LTO when building the compiler in release mode. There are slight differences between platforms so you'll need to do a manual setup. LTO is enabled by setting `lto` to `yes` in the build command line:
 
 ```bash
-$ make config=release lto=yes
+$ make lto=yes
 ```
 
 If the build fails, you have to specify the LTO plugin for your compiler in the `LTO_PLUGIN` variable. For example:
 
 ```bash
-$ make config=release LTO_PLUGIN=/usr/lib/LLVMgold.so
+$ make LTO_PLUGIN=/usr/lib/LLVMgold.so
 ```
 
 Refer to your compiler documentation for the plugin to use in your case.

@@ -11,6 +11,9 @@ actor Main is TestList
     test(_TestStdinStdout)
     test(_TestStderr)
     test(_TestFileExec)
+    test(_TestExpect)
+    test(_TestWritevOrdering)
+    test(_TestPrintvOrdering)
 
 class iso _TestStdinStdout is UnitTest
   fun name(): String =>
@@ -92,6 +95,116 @@ class iso _TestFileExec is UnitTest
   fun timed_out(h: TestHelper) =>
     h.complete(false)
 
+class iso _TestExpect is UnitTest
+  fun name(): String =>
+    "process/Expect"
+
+  fun apply(h: TestHelper) =>
+    let notifier = recover object is ProcessNotify
+      let _h: TestHelper = h
+      var _expect: USize = 0
+      let _out: Array[String] = Array[String]
+
+      fun ref created(process: ProcessMonitor ref) =>
+        process.expect(2)
+
+      fun ref expect(process: ProcessMonitor ref, qty: USize): USize =>
+        _expect = qty
+        _expect
+
+      fun ref stdout(process: ProcessMonitor ref, data: Array[U8] iso) =>
+        _h.assert_eq[USize](_expect, data.size())
+        process.expect(if _expect == 2 then 4 else 2 end)
+        _out.push(String.from_array(consume data))
+
+      fun ref dispose(process: ProcessMonitor ref, child_exit_code: I32) =>
+        _h.assert_eq[I32](child_exit_code, 0)
+        _h.assert_array_eq[String](_out, ["he", "llo ", "th", "ere!"])
+        _h.complete(true)
+    end end
+    try
+      let path = FilePath(h.env.root as AmbientAuth, "/bin/echo")
+      let args: Array[String] iso = recover Array[String](1) end
+      args.push("echo")
+      args.push("hello there!")
+      let vars: Array[String] iso = recover Array[String](2) end
+      vars.push("HOME=/")
+      vars.push("PATH=/bin")
+
+      let pm: ProcessMonitor = ProcessMonitor(consume notifier, path,
+        consume args, consume vars)
+        h.long_test(5_000_000_000)
+    else
+      h.fail("Could not create FilePath!")
+    end
+
+  fun timed_out(h: TestHelper) =>
+    h.complete(false)
+
+class iso _TestWritevOrdering is UnitTest
+  fun name(): String =>
+    "process/WritevOrdering"
+
+  fun apply(h: TestHelper) =>
+    let notifier: ProcessNotify iso = _ProcessClient("onetwothree",
+      "", 0, h)
+    try
+      let path = FilePath(h.env.root as AmbientAuth, "/bin/cat")
+      let args: Array[String] iso = recover Array[String](1) end
+      args.push("cat")
+      let vars: Array[String] iso = recover Array[String](2) end
+      vars.push("HOME=/")
+      vars.push("PATH=/bin")
+
+      let pm: ProcessMonitor = ProcessMonitor(consume notifier, path,
+        consume args, consume vars)
+      let params: Array[String] iso = recover Array[String](3) end
+      params.push("one")
+      params.push("two")
+      params.push("three")
+
+      pm.writev(consume params)
+      pm.done_writing()  // closing stdin allows "cat" to terminate
+      h.long_test(5_000_000_000)
+    else
+      h.fail("Could not create FilePath!")
+    end
+
+  fun timed_out(h: TestHelper) =>
+    h.complete(false)
+
+class iso _TestPrintvOrdering is UnitTest
+  fun name(): String =>
+    "process/PrintvOrdering"
+
+  fun apply(h: TestHelper) =>
+    let notifier: ProcessNotify iso = _ProcessClient("one\ntwo\nthree\n",
+      "", 0, h)
+    try
+      let path = FilePath(h.env.root as AmbientAuth, "/bin/cat")
+      let args: Array[String] iso = recover Array[String](1) end
+      args.push("cat")
+      let vars: Array[String] iso = recover Array[String](2) end
+      vars.push("HOME=/")
+      vars.push("PATH=/bin")
+
+      let pm: ProcessMonitor = ProcessMonitor(consume notifier, path,
+        consume args, consume vars)
+      let params: Array[String] iso = recover Array[String](3) end
+      params.push("one")
+      params.push("two")
+      params.push("three")
+
+      pm.printv(consume params)
+      pm.done_writing()  // closing stdin allows "cat" to terminate
+      h.long_test(5_000_000_000)
+    else
+      h.fail("Could not create FilePath!")
+    end
+
+  fun timed_out(h: TestHelper) =>
+    h.complete(false)
+
 class _ProcessClient is ProcessNotify
   """
   Notifications for Process connections.
@@ -156,3 +269,4 @@ class _ProcessClient is ProcessNotify
     _h.assert_eq[String box](_err, _d_stderr)
     _h.assert_eq[I32](_exit_code, child_exit_code)
     _h.complete(true)
+

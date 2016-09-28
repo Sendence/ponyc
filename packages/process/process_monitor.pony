@@ -180,7 +180,10 @@ actor ProcessMonitor
   var _stdout_event: AsioEventID = AsioEvent.none()
   var _stderr_event: AsioEventID = AsioEvent.none()
 
-  var _read_buf: Array[U8] iso = recover Array[U8].undefined(4096) end
+  let _max_size: USize = 4096
+  var _read_buf: Array[U8] iso = recover Array[U8].undefined(_max_size) end
+  var _read_len: USize = 0
+  var _expect: USize = 0
 
   var _stdin_read:   U32 = -1
   var _stdin_write:  U32 = -1
@@ -245,6 +248,7 @@ actor ProcessMonitor
     else
       compile_error "unsupported platform"
     end
+    _notifier.created(this)
 
   fun _child(path: String, argp: Array[Pointer[U8] tag],
     envp: Array[Pointer[U8] tag])
@@ -362,8 +366,7 @@ actor ProcessMonitor
     """
     Print some bytes and insert a newline afterwards.
     """
-    write(data)
-    write("\n")
+    _print_final(data)
 
   be write(data: ByteSeq) =>
     """
@@ -387,7 +390,7 @@ actor ProcessMonitor
     Print an iterable collection of ByteSeqs.
     """
     for bytes in data.values() do
-      print(bytes)
+      _print_final(bytes)
     end
 
   be writev(data: ByteSeqIter) =>
@@ -395,7 +398,24 @@ actor ProcessMonitor
     Write an iterable collection of ByteSeqs.
     """
     for bytes in data.values() do
-      write(bytes)
+      _write_final(bytes)
+    end
+
+  fun ref _print_final(data: ByteSeq) =>
+    _write_final(data)
+    _write_final("\n")
+
+  fun ref _write_final(data: ByteSeq) =>
+    ifdef posix then
+      let d = data
+      if _stdin_write > 0 then
+        let res = @write[ISize](_stdin_write, d.cstring(), d.size())
+        if res < 0 then
+          _notifier.failed(this, WriteError)
+        end
+      else
+        _notifier.failed(this, WriteError)
+      end
     end
 
   be done_writing() =>
@@ -415,6 +435,14 @@ actor ProcessMonitor
       return
     end
     _close()
+
+  fun ref expect(qty: USize = 0) =>
+    """
+    A `stdout` call on the notifier must contain exactly `qty` bytes. If
+    `qty` is zero, the call can contain any amount of data.
+    """
+    _expect = _notifier.expect(this, qty)
+    _read_buf_size()
 
   fun _kill_child() ? =>
     """
@@ -526,7 +554,8 @@ actor ProcessMonitor
       if fd == -1 then return false end
       var sum: USize = 0
       while true do
-        let len = @read[ISize](fd, _read_buf.cstring(), _read_buf.space())
+        let len = @read[ISize](fd, _read_buf.cstring().usize() + _read_len,
+          _read_buf.size() - _read_len)
         let errno = @pony_os_errno()
         let next = _read_buf.space()
         match len
@@ -539,24 +568,42 @@ actor ProcessMonitor
         | 0  =>
           _close_fd(fd)
           return false
-        else
-          let data = _read_buf = recover Array[U8].undefined(next) end
-          data.truncate(len.usize())
-          match fd
-          | _stdout_read => _notifier.stdout(this, consume data)
-          | _stderr_read => _notifier.stderr(this, consume data)
+        end
+
+        _read_len = _read_len + len.usize()
+
+        let data = _read_buf = recover Array[U8].undefined(next) end
+        data.truncate(_read_len)
+
+        match fd
+        | _stdout_read =>
+          if _read_len >= _expect then
+            _notifier.stdout(this, consume data)
           end
-          sum = sum + len.usize()
-          if sum > (1 << 12) then
-            // If we've read 4 kb, yield and read again later.
-            _read_again(fd)
-            return true
-          end
+        | _stderr_read =>
+          _notifier.stderr(this, consume data)
+        end
+
+        _read_len = 0
+        _read_buf_size()
+
+        sum = sum + len.usize()
+        if sum > (1 << 12) then
+          // If we've read 4 kb, yield and read again later.
+          _read_again(fd)
+          return true
         end
       end
       true
     else
       true
+    end
+
+  fun ref _read_buf_size() =>
+    if _expect > 0 then
+      _read_buf.undefined(_expect)
+    else
+      _read_buf.undefined(_max_size)
     end
 
   be _read_again(fd: U32) =>

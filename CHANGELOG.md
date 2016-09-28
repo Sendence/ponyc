@@ -5,20 +5,53 @@ All notable changes to the Pony compiler and standard library will be documented
 ## [unreleased] - unreleased
 
 ### Fixed
+
+
+### Added
+
+
+### Changed
+
+
+## [0.4.0] - 2016-09-26
+
+### Fixed
+
+- Unexpected message ordering in `ProcessManager` (issue #1265)
+
+### Added
+
+- TCP writev performance improvement by avoiding throwing errors
+
+## [0.3.3] - 2016-09-23
+
+### Fixed
+
 - Incorrect build number generated on Windows when building from non-git directory.
+- Stop generating `llvm.invariant.load` for fields of `val` references.
+- Embedded fields construction through tuples.
 
 ### Added
 - Improved error handling for `files` package.
 
+- Improved error handling for `files` package.
+- ProcessMonitor.expect
+- ProcessNotify.created
+- ProcessNotify.expect
+
 ### Changed
+
+- On Linux and FreeBSD, ponyc now uses $CC as the linker if the environment variable is defined.
 
 ## [0.3.2] - 2016-09-18
 
 ### Fixed
+
 - The `ponyc` version is now consistently set from the VERSION file.
 - Stop generating `llvm.invariant.load` intrinsic for "let" references, as these don't necessarily match the semantics of that intrinsic.
 
 ### Changed
+
 - The `setversion` and `release` commands have been removed from `Makefile`.
 - LTO is again enabled by default on OSX
 - make now builds a `release` rather than `debug` build by default
@@ -26,6 +59,7 @@ All notable changes to the Pony compiler and standard library will be documented
 ## [0.3.1] - 2016-09-14
 
 ### Fixed
+
 - Make sure all scheduler threads are pinned to CPU cores; on Linux/FreeBSD this wasn't the case for the main thread.
 - Account for both hyperthreading and NUMA locality when assigning scheduler threads to cores on Linux.
 - Stop generating `llvm.invariant.start` intrinsic. It was causing various problems in code generation.
@@ -35,6 +69,7 @@ All notable changes to the Pony compiler and standard library will be documented
 - Issue #1212 by reverting commit e56075d46d7d9e1d8c5e8be7ed0506ad2de98734
 
 ### Added
+
 - `--ponypinasio` runtime option for pinning asio thread to a cpu core.
 - `--ponynopin` runtime option for not pinning any threads at all.
 
