@@ -295,7 +295,7 @@ class _TestTCPWritevNotifyServer is TCPConnectionNotify
   new iso create(h: TestHelper) =>
     _h = h
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     _buffer.append(consume data)
 
     let expected = "hello, hello (from client)"
@@ -305,3 +305,4 @@ class _TestTCPWritevNotifyServer is TCPConnectionNotify
       _h.assert_eq[String](expected, consume buffer)
       _h.complete_action("server receive")
     end
+    true
