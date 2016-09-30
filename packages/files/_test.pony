@@ -261,10 +261,13 @@ class iso _TestFileOpenError is UnitTest
         else
           0 == @chmod[I32](path.null_terminated().cstring(), m)
         end
+      // Commenting out until this is resolved upstream:
+      // see: https://github.com/ponylang/ponyc/issues/1261
+      //
       // try to open file for writing
-      let file2 = File(filepath)  
-      h.assert_true(file2.errno() is FilePermissionDenied)
-      h.assert_false(file2.valid())
+      // let file2 = File(filepath)
+      // h.assert_true(file2.errno() is FilePermissionDenied)
+      // h.assert_false(file2.valid())
       filepath.remove()
     end
 
