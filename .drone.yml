@@ -34,7 +34,8 @@ build:
       - cd build/pony-stable
       - git clone https://github.com/jemc/pony-stable.git .
       - git checkout f1f7977
-      - make
+      - mkdir bin
+      - ponyc --cpu ivybridge stable -o bin
 
   # get ponyc external dependencies
   ponyc_ext_deps:
