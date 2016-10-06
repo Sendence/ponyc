@@ -20,8 +20,8 @@ build:
   main_ponyc:
     image: sendence/ponyc-builder:0.0.3
     commands:
-      - make config=$$PONYC_CONFIG clean
-      - make config=$$PONYC_CONFIG test
+      - make config=$$PONYC_CONFIG arch=ivybridge clean
+      - make config=$$PONYC_CONFIG arch=ivybridge test
       - rm build/$$PONYC_CONFIG/libponyc.tests
       - rm build/$$PONYC_CONFIG/libponyrt.tests
 
