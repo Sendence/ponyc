@@ -2,6 +2,8 @@ use "path:/usr/local/opt/libressl/lib" if osx
 use "lib:crypto" if not windows
 use "lib:libcrypto-32" if windows
 
+use "format"
+
 interface HashFn
   """
   Produces a fixed-length byte array based on the input sequence.
@@ -19,8 +21,8 @@ primitive MD4 is HashFn
         @pony_ctx[Pointer[None] iso](),
         size
       )
-      @MD4[Pointer[U8]](input.cstring(), input.size(), digest)
-      Array[U8].from_cstring(digest, size)
+      @MD4[Pointer[U8]](input.cpointer(), input.size(), digest)
+      Array[U8].from_cpointer(digest, size)
     end
 
 primitive MD5 is HashFn
@@ -34,8 +36,8 @@ primitive MD5 is HashFn
         @pony_ctx[Pointer[None] iso](),
         size
       )
-      @MD5[Pointer[U8]](input.cstring(), input.size(), digest)
-      Array[U8].from_cstring(digest, size)
+      @MD5[Pointer[U8]](input.cpointer(), input.size(), digest)
+      Array[U8].from_cpointer(digest, size)
     end
 
 primitive RIPEMD160 is HashFn
@@ -49,8 +51,8 @@ primitive RIPEMD160 is HashFn
         @pony_ctx[Pointer[None] iso](),
         size
       )
-      @RIPEMD160[Pointer[U8]](input.cstring(), input.size(), digest)
-      Array[U8].from_cstring(digest, size)
+      @RIPEMD160[Pointer[U8]](input.cpointer(), input.size(), digest)
+      Array[U8].from_cpointer(digest, size)
     end
 
 primitive SHA1 is HashFn
@@ -65,8 +67,8 @@ primitive SHA1 is HashFn
         @pony_ctx[Pointer[None] iso](),
         size
       )
-      @SHA1[Pointer[U8]](input.cstring(), input.size(), digest)
-      Array[U8].from_cstring(digest, size)
+      @SHA1[Pointer[U8]](input.cpointer(), input.size(), digest)
+      Array[U8].from_cpointer(digest, size)
     end
 
 primitive SHA224 is HashFn
@@ -81,8 +83,8 @@ primitive SHA224 is HashFn
         @pony_ctx[Pointer[None] iso](),
         size
       )
-      @SHA224[Pointer[U8]](input.cstring(), input.size(), digest)
-      Array[U8].from_cstring(digest, size)
+      @SHA224[Pointer[U8]](input.cpointer(), input.size(), digest)
+      Array[U8].from_cpointer(digest, size)
     end
 
 primitive SHA256 is HashFn
@@ -97,8 +99,8 @@ primitive SHA256 is HashFn
         @pony_ctx[Pointer[None] iso](),
         size
       )
-      @SHA256[Pointer[U8]](input.cstring(), input.size(), digest)
-      Array[U8].from_cstring(digest, size)
+      @SHA256[Pointer[U8]](input.cpointer(), input.size(), digest)
+      Array[U8].from_cpointer(digest, size)
     end
 
 primitive SHA384 is HashFn
@@ -113,8 +115,8 @@ primitive SHA384 is HashFn
         @pony_ctx[Pointer[None] iso](),
         size
       )
-      @SHA384[Pointer[U8]](input.cstring(), input.size(), digest)
-      Array[U8].from_cstring(digest, size)
+      @SHA384[Pointer[U8]](input.cpointer(), input.size(), digest)
+      Array[U8].from_cpointer(digest, size)
     end
 
 primitive SHA512 is HashFn
@@ -129,8 +131,8 @@ primitive SHA512 is HashFn
         @pony_ctx[Pointer[None] iso](),
         size
       )
-      @SHA512[Pointer[U8]](input.cstring(), input.size(), digest)
-      Array[U8].from_cstring(digest, size)
+      @SHA512[Pointer[U8]](input.cpointer(), input.size(), digest)
+      Array[U8].from_cpointer(digest, size)
     end
 
 primitive ToHexString
@@ -139,10 +141,9 @@ primitive ToHexString
     Return the lower-case hexadecimal string representation of the given Array
     of U8.
     """
-    let fmt = FormatSettingsInt.set_format(FormatHexSmallBare).set_width(2)
-    fmt.fill' = '0'
     let out = recover String(bs.size() * 2) end
     for c in bs.values() do
-      out.append(c.string(fmt))
+      out.append(Format.int[U8](c where
+        fmt=FormatHexSmallBare, width=2, fill='0'))
     end
     consume out

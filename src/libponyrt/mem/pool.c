@@ -1,6 +1,9 @@
+#define PONY_WANT_ATOMIC_DEFS
+
 #include "pool.h"
 #include "alloc.h"
 #include "../ds/fun.h"
+#include "../sched/cpu.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -9,6 +12,7 @@
 #include <assert.h>
 
 #include <platform.h>
+#include <pony/detail/atomics.h>
 
 #ifdef USE_VALGRIND
 #include <valgrind/valgrind.h>
@@ -63,7 +67,9 @@ typedef struct pool_global_t
 {
   size_t size;
   size_t count;
-  ATOMIC_TYPE(pool_central_t*) central;
+  PONY_ATOMIC(pool_central_t*) central;
+  PONY_ATOMIC(size_t )ticket;
+  PONY_ATOMIC(size_t) waiting_for;
 } pool_global_t;
 
 /// An item on a thread-local list of free blocks.
@@ -84,22 +90,22 @@ typedef struct pool_block_header_t
 
 static pool_global_t pool_global[POOL_COUNT] =
 {
-  {POOL_MIN << 0, POOL_MAX / (POOL_MIN << 0), NULL},
-  {POOL_MIN << 1, POOL_MAX / (POOL_MIN << 1), NULL},
-  {POOL_MIN << 2, POOL_MAX / (POOL_MIN << 2), NULL},
-  {POOL_MIN << 3, POOL_MAX / (POOL_MIN << 3), NULL},
-  {POOL_MIN << 4, POOL_MAX / (POOL_MIN << 4), NULL},
-  {POOL_MIN << 5, POOL_MAX / (POOL_MIN << 5), NULL},
-  {POOL_MIN << 6, POOL_MAX / (POOL_MIN << 6), NULL},
-  {POOL_MIN << 7, POOL_MAX / (POOL_MIN << 7), NULL},
-  {POOL_MIN << 8, POOL_MAX / (POOL_MIN << 8), NULL},
-  {POOL_MIN << 9, POOL_MAX / (POOL_MIN << 9), NULL},
-  {POOL_MIN << 10, POOL_MAX / (POOL_MIN << 10), NULL},
-  {POOL_MIN << 11, POOL_MAX / (POOL_MIN << 11), NULL},
-  {POOL_MIN << 12, POOL_MAX / (POOL_MIN << 12), NULL},
-  {POOL_MIN << 13, POOL_MAX / (POOL_MIN << 13), NULL},
-  {POOL_MIN << 14, POOL_MAX / (POOL_MIN << 14), NULL},
-  {POOL_MIN << 15, POOL_MAX / (POOL_MIN << 15), NULL},
+  {POOL_MIN << 0, POOL_MAX / (POOL_MIN << 0), NULL, 0, 0},
+  {POOL_MIN << 1, POOL_MAX / (POOL_MIN << 1), NULL, 0, 0},
+  {POOL_MIN << 2, POOL_MAX / (POOL_MIN << 2), NULL, 0, 0},
+  {POOL_MIN << 3, POOL_MAX / (POOL_MIN << 3), NULL, 0, 0},
+  {POOL_MIN << 4, POOL_MAX / (POOL_MIN << 4), NULL, 0, 0},
+  {POOL_MIN << 5, POOL_MAX / (POOL_MIN << 5), NULL, 0, 0},
+  {POOL_MIN << 6, POOL_MAX / (POOL_MIN << 6), NULL, 0, 0},
+  {POOL_MIN << 7, POOL_MAX / (POOL_MIN << 7), NULL, 0, 0},
+  {POOL_MIN << 8, POOL_MAX / (POOL_MIN << 8), NULL, 0, 0},
+  {POOL_MIN << 9, POOL_MAX / (POOL_MIN << 9), NULL, 0, 0},
+  {POOL_MIN << 10, POOL_MAX / (POOL_MIN << 10), NULL, 0, 0},
+  {POOL_MIN << 11, POOL_MAX / (POOL_MIN << 11), NULL, 0, 0},
+  {POOL_MIN << 12, POOL_MAX / (POOL_MIN << 12), NULL, 0, 0},
+  {POOL_MIN << 13, POOL_MAX / (POOL_MIN << 13), NULL, 0, 0},
+  {POOL_MIN << 14, POOL_MAX / (POOL_MIN << 14), NULL, 0, 0},
+  {POOL_MIN << 15, POOL_MAX / (POOL_MIN << 15), NULL, 0, 0},
 };
 
 static __pony_thread_local pool_local_t pool_local[POOL_COUNT];
@@ -129,7 +135,7 @@ typedef struct
 } pool_track_info_t;
 
 static __pony_thread_local pool_track_info_t track;
-static ATOMIC_TYPE(int) track_global_thread_id;
+static PONY_ATOMIC(int) track_global_thread_id;
 static pool_track_info_t* track_global_info[POOL_TRACK_MAX_THREADS];
 
 static void pool_event_print(int thread, void* op, size_t event, size_t tsc,
@@ -462,8 +468,6 @@ static void pool_free_pages(void* p, size_t size)
 
 static void pool_push(pool_local_t* thread, pool_global_t* global)
 {
-  pool_central_t* cmp;
-  pool_central_t* xchg;
   pool_central_t* p = (pool_central_t*)thread->pool;
   p->length = thread->length;
 
@@ -473,53 +477,63 @@ static void pool_push(pool_local_t* thread, pool_global_t* global)
   assert(p->length == global->count);
   TRACK_PUSH((pool_item_t*)p, p->length, global->size);
 
-  cmp = atomic_load_explicit(&global->central, memory_order_acquire);
+  size_t my_ticket = atomic_fetch_add_explicit(&global->ticket, 1,
+    memory_order_relaxed);
 
-  uintptr_t mask = UINTPTR_MAX ^ ((1 << POOL_MIN_BITS) - 1);
+  while(my_ticket != atomic_load_explicit(&global->waiting_for,
+    memory_order_relaxed))
+    ponyint_cpu_relax();
 
-  do
-  {
-    // We know the alignment boundary of the objects in the stack so we use the
-    // low bits for ABA protection.
-    uintptr_t aba = (uintptr_t)cmp & ~mask;
-    p->central = (pool_central_t*)((uintptr_t)cmp & mask);
+  atomic_thread_fence(memory_order_acquire);
 
-    xchg = (pool_central_t*)((uintptr_t)p | ((aba + 1) & ~mask));
-  } while(!atomic_compare_exchange_weak_explicit(&global->central, &cmp, xchg,
-    memory_order_release, memory_order_relaxed));
+  pool_central_t* top = atomic_load_explicit(&global->central,
+    memory_order_relaxed);
+  p->central = top;
+
+  atomic_store_explicit(&global->central, p, memory_order_relaxed);
+  atomic_store_explicit(&global->waiting_for, my_ticket + 1,
+    memory_order_release);
 }
 
 static pool_item_t* pool_pull(pool_local_t* thread, pool_global_t* global)
 {
-  pool_central_t* cmp;
-  pool_central_t* xchg;
-  pool_central_t* next;
+  // If we believe the global free list is empty, bailout immediately without
+  // taking a ticket to avoid unnecessary contention.
+  if(atomic_load_explicit(&global->central, memory_order_relaxed) == NULL)
+    return NULL;
 
-  cmp = atomic_load_explicit(&global->central, memory_order_acquire);
+  size_t my_ticket = atomic_fetch_add_explicit(&global->ticket, 1,
+    memory_order_relaxed);
 
-  uintptr_t mask = UINTPTR_MAX ^ ((1 << POOL_MIN_BITS) - 1);
+  while(my_ticket != atomic_load_explicit(&global->waiting_for,
+    memory_order_relaxed))
+    ponyint_cpu_relax();
 
-  do
+  atomic_thread_fence(memory_order_acquire);
+
+  pool_central_t* top = atomic_load_explicit(&global->central,
+    memory_order_relaxed);
+
+  if(top == NULL)
   {
-    // We know the alignment boundary of the objects in the stack so we use the
-    // low bits for ABA protection.
-    uintptr_t aba = (uintptr_t)cmp & ~mask;
-    next = (pool_central_t*)((uintptr_t)cmp & mask);
+    atomic_store_explicit(&global->waiting_for, my_ticket + 1,
+      memory_order_relaxed);
+    return NULL;
+  }
 
-    if(next == NULL)
-      return NULL;
+  pool_central_t* next = top->central;
 
-    xchg = (pool_central_t*)((uintptr_t)next->central | ((aba + 1) & ~mask));
-  } while(!atomic_compare_exchange_weak_explicit(&global->central, &cmp, xchg,
-    memory_order_acq_rel, memory_order_relaxed));
+  atomic_store_explicit(&global->central, next, memory_order_relaxed);
+  atomic_store_explicit(&global->waiting_for, my_ticket + 1,
+    memory_order_release);
 
-  pool_item_t* p = (pool_item_t*)next;
+  pool_item_t* p = (pool_item_t*)top;
 
-  assert(next->length == global->count);
-  TRACK_PULL(p, next->length, global->size);
+  assert(top->length == global->count);
+  TRACK_PULL(p, top->length, global->size);
 
   thread->pool = p->next;
-  thread->length = next->length - 1;
+  thread->length = top->length - 1;
 
   return p;
 }

@@ -18,10 +18,7 @@ use "process"
 use "files"
 
 actor Main
-  let _env: Env
-
   new create(env: Env) =>
-    _env = env
     // create a notifier
     let client = ProcessClient(_env)
     let notifier: ProcessNotify iso = consume client
@@ -36,7 +33,8 @@ actor Main
       vars.push("HOME=/")
       vars.push("PATH=/bin")
       // create a ProcessMonitor and spawn the child process
-      let pm: ProcessMonitor = ProcessMonitor(consume notifier, path,
+      let auth = env.root as AmbientAuth
+      let pm: ProcessMonitor = ProcessMonitor(auth, consume notifier, path,
       consume args, consume vars)
       // write to STDIN of the child process
       pm.write("one, two, three")
@@ -64,14 +62,11 @@ class ProcessClient is ProcessNotify
     match err
     | ExecveError   => _env.out.print("ProcessError: ExecveError")
     | PipeError     => _env.out.print("ProcessError: PipeError")
-    | Dup2Error     => _env.out.print("ProcessError: Dup2Error")
     | ForkError     => _env.out.print("ProcessError: ForkError")
-    | FcntlError    => _env.out.print("ProcessError: FcntlError")
     | WaitpidError  => _env.out.print("ProcessError: WaitpidError")
-    | CloseError    => _env.out.print("ProcessError: CloseError")
-    | ReadError     => _env.out.print("ProcessError: ReadError")
     | WriteError    => _env.out.print("ProcessError: WriteError")
     | KillError     => _env.out.print("ProcessError: KillError")
+    | CapError      => _env.out.print("ProcessError: CapError")
     | Unsupported   => _env.out.print("ProcessError: Unsupported")
     else
       _env.out.print("Unknown ProcessError!")
@@ -144,12 +139,8 @@ primitive _ONONBLOCK
 
 primitive ExecveError
 primitive PipeError
-primitive Dup2Error
 primitive ForkError
-primitive FcntlError
 primitive WaitpidError
-primitive CloseError
-primitive ReadError
 primitive WriteError
 primitive KillError
 primitive Unsupported // we throw this on non POSIX systems
@@ -157,18 +148,16 @@ primitive CapError
 
 type ProcessError is
   ( ExecveError
-  | CloseError
-  | Dup2Error
-  | FcntlError
   | ForkError
   | KillError
   | PipeError
-  | ReadError
   | Unsupported
   | WaitpidError
   | WriteError
   | CapError
   )
+
+type ProcessMonitorAuth is (AmbientAuth | StartProcessAuth)
 
 actor ProcessMonitor
   """
@@ -197,8 +186,8 @@ actor ProcessMonitor
 
   var _closed: Bool = false
 
-  new create(notifier: ProcessNotify iso, filepath: FilePath,
-    args: Array[String] val, vars: Array[String] val)
+  new create(auth: ProcessMonitorAuth, notifier: ProcessNotify iso,
+    filepath: FilePath, args: Array[String] val, vars: Array[String] val)
   =>
     """
     Create infrastructure to communicate with a forked child process
@@ -206,8 +195,22 @@ actor ProcessMonitor
     user about incoming data via the notifier.
     """
     _notifier = consume notifier
+
+    // We need permission to execute and the
+    // file itself needs to be an executable
     if not filepath.caps(FileExec) then
       _notifier.failed(this, CapError)
+      return
+    end
+
+    let ok = try
+      FileInfo(filepath).mode.any_exec
+    else
+      false
+    end
+    if not ok then
+      // path is to a non-executable file or that file doesn't exist
+      _notifier.failed(this, ExecveError)
       return
     end
 
@@ -265,8 +268,8 @@ actor ProcessMonitor
       _dup2(_stdin_read, _STDINFILENO())    // redirect stdin
       _dup2(_stdout_write, _STDOUTFILENO()) // redirect stdout
       _dup2(_stderr_write, _STDERRFILENO()) // redirect stderr
-      if 0 > @execve[I32](path.null_terminated().cstring(), argp.cstring(),
-        envp.cstring())
+      if 0 > @execve[I32](path.cstring(), argp.cpointer(),
+        envp.cpointer())
       then
         @_exit[None](I32(-1))
       end
@@ -292,7 +295,7 @@ actor ProcessMonitor
     """
     let argv = Array[Pointer[U8] tag](args.size() + 1)
     for s in args.values() do
-      argv.push(s.null_terminated().cstring())
+      argv.push(s.cstring())
     end
     argv.push(Pointer[U8]) // nullpointer to terminate list of args
     argv
@@ -376,7 +379,7 @@ actor ProcessMonitor
     ifdef posix then
       let d = data
       if _stdin_write > 0 then
-        let res = @write[ISize](_stdin_write, d.cstring(), d.size())
+        let res = @write[ISize](_stdin_write, d.cpointer(), d.size())
         if res < 0 then
           _notifier.failed(this, WriteError)
         end
@@ -409,7 +412,7 @@ actor ProcessMonitor
     ifdef posix then
       let d = data
       if _stdin_write > 0 then
-        let res = @write[ISize](_stdin_write, d.cstring(), d.size())
+        let res = @write[ISize](_stdin_write, d.cpointer(), d.size())
         if res < 0 then
           _notifier.failed(this, WriteError)
         end
@@ -554,7 +557,7 @@ actor ProcessMonitor
       if fd == -1 then return false end
       var sum: USize = 0
       while true do
-        let len = @read[ISize](fd, _read_buf.cstring().usize() + _read_len,
+        let len = @read[ISize](fd, _read_buf.cpointer().usize() + _read_len,
           _read_buf.size() - _read_len)
         let errno = @pony_os_errno()
         let next = _read_buf.space()

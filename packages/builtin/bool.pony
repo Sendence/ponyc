@@ -27,5 +27,5 @@ primitive Bool is Stringable
   fun f32(): F32 => compile_intrinsic
   fun f64(): F64 => compile_intrinsic
 
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-    (if this then "true" else "false" end).string(fmt)
+  fun string(): String iso^ =>
+    (if this then "true" else "false" end).string()
