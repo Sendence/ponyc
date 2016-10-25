@@ -10,7 +10,7 @@ clone:
 build:
   # build ponyrt for armhf
   arm_ponyrt:
-    image: sendence/ponyc-builder:0.0.3
+    image: sendence/ponyc-builder:0.0.4
     commands:
       - CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ make arch=armv7-a bits=32 config=$$PONYC_CONFIG libponyrt
       - mv build/$$PONYC_CONFIG/libponyrt.a build/arm-libponyrt.a
@@ -18,7 +18,7 @@ build:
 
   # build ponyc and run tests
   main_ponyc:
-    image: sendence/ponyc-builder:0.0.3
+    image: sendence/ponyc-builder:0.0.4
     commands:
       - make config=$$PONYC_CONFIG arch=ivybridge clean
       - make config=$$PONYC_CONFIG arch=ivybridge test
@@ -27,7 +27,7 @@ build:
 
   # build pony stable
   pony-stable:
-    image: sendence/ponyc-builder:0.0.3
+    image: sendence/ponyc-builder:0.0.4
     commands:
       - export PATH=$PATH:$PWD/build/$$PONYC_CONFIG
       - mkdir -p build/pony-stable
