@@ -2,16 +2,68 @@
 
 All notable changes to the Pony compiler and standard library will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/) and [Keep a CHANGELOG](http://keepachangelog.com/).
 
-## [unreleased] - unreleased
+## [0.7.0] - 2016-10-22
 
 ### Fixed
 
+- Concatenate docstrings from case methods (issue #575).
 
 ### Added
 
+- TCP read and write backpressure hooks in `TCPConnection` (issue #1311)
+- Allow TCP notifiers to cause connections to yield while receiving (issue #1343)
 
 ### Changed
 
+- `break` without a value now generates its value from the `else` branch of a loop instead of being an implicit `break None`.
+- The `for` loop will now break out of the loop instead of continuing with the following iterations if `Iterator.next` errors.
+
+## [0.6.0] - 2016-10-20
+
+### Fixed
+
+- Compiling ponyrt with Clang versions >= 3.3, < 3.6.
+- Restrict mutable tuple recovery to maintain reference capability security (issue #1123)
+- Crash in the runtime scheduler queues
+
+### Added
+
+- DTrace and SystemTap support - `use=dtrace`
+
+### Changed
+
+- Replaces `use=telemetry` by DTrace/SystemTap scripts
+- `String.cstring()` now always returns a null-terminated string
+  (which may result in a copy) while `cpointer()` (also available on
+  `Array` objects) returns a pointer to the underlying array as-is
+  (issue #1309).
+
+## [0.5.1] - 2016-10-15
+
+### Fixed
+
+- `SSLConnection` ignoring the `sent` notifier method (issue #1268)
+- Runtime crash in the runtime scheduler queues (issue #1319)
+
+## [0.5.0] - 2016-10-09
+
+### Fixed
+
+- Memory copy bounds for `String.clone` (issue #1289).
+- Security issues in `ProcessMonitor` (issue #1180)
+- `SSLConnection` bugs due to missing `sentv` notify method (issue #1282)
+
+### Added
+
+- `Iter` class (issue #1267)
+- read_until method on buffered.Reader (RFC 0013)
+- `format` package (issue #1285)
+
+### Changed
+
+- `Stringable` interface no longer involves formatting (issue #1285)
+- Remove unused error types from ProcessError (issue #1293)
+- HTML documentation for expanded union types now adds line breaks to improve readability (issue #1263)
 
 ## [0.4.0] - 2016-09-26
 

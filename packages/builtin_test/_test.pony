@@ -33,7 +33,6 @@ actor Main is TestList
     test(_TestStringIsNullTerminated)
     test(_TestStringReplace)
     test(_TestStringSplit)
-    test(_TestStringSplitInPlace)
     test(_TestStringJoin)
     test(_TestStringCount)
     test(_TestStringCompare)
@@ -54,10 +53,10 @@ actor Main is TestList
     test(_TestMath128)
     test(_TestDivMod)
     test(_TestAddc)
+    test(_TestNextPow2)
     test(_TestMaybePointer)
     test(_TestValtrace)
     test(_TestCCallback)
-    test(_TestFormatSettingsInt)
 
 
 class iso _TestAbs is UnitTest
@@ -134,12 +133,6 @@ class iso _TestIntToString is UnitTest
     h.assert_eq[String]("0", U32(0).string())
     h.assert_eq[String]("3", U32(3).string())
     h.assert_eq[String]("1234", U32(1234).string())
-    h.assert_eq[String]("003",
-      U32(3).string(FormatSettingsInt.set_precision(3)))
-    h.assert_eq[String]("  3",
-      U32(3).string(FormatSettingsInt.set_width(3)))
-    h.assert_eq[String]("  003",
-      U32(3).string(FormatSettingsInt.set_precision(3).set_width(5)))
 
 
 class iso _TestFloatToString is UnitTest
@@ -425,6 +418,7 @@ class iso _TestStringTrimInPlace is UnitTest
     let copy: String ref = orig.clone()
     copy.trim_in_place(from, to)
     h.assert_eq[String box](expected, copy)
+    h.assert_eq[String box](expected, copy.clone()) // safe to clone
 
 
 class iso _TestStringIsNullTerminated is UnitTest
@@ -439,7 +433,7 @@ class iso _TestStringIsNullTerminated is UnitTest
     h.assert_true("0123456".trim(4, 7).is_null_terminated())
     h.assert_false("0123456".trim(2, 4).is_null_terminated())
     h.assert_true("0123456".trim(2, 4).clone().is_null_terminated())
-    h.assert_true("0123456".trim(2, 4).null_terminated().is_null_terminated())
+    h.assert_false("0123456".trim(2, 4).is_null_terminated())
 
 
 class iso _TestSpecialValuesF32 is UnitTest
@@ -540,41 +534,6 @@ class iso _TestStringSplit is UnitTest
     h.assert_eq[String](r(0), "1")
     h.assert_eq[String](r(1), "2")
     h.assert_eq[String](r(2), "3  4")
-
-class iso _TestStringSplitInPlace is UnitTest
-  """
-  Test String.split_in_place
-  """
-  fun name(): String => "builtin/String.split_in_place"
-
-  fun apply(h: TestHelper) ? =>
-    if false then
-      error
-    end
-    var r = "1 2 3  4".split_in_place()
-    h.assert_eq[USize](r.size(), 5)
-    h.assert_eq[String](r(0), "1")
-    h.assert_eq[String](r(1), "2")
-    h.assert_eq[String](r(2), "3")
-    h.assert_eq[String](r(3), "")
-    h.assert_eq[String](r(4), "4")
-
-    r = "1 2 3  4".split_in_place(where n = 3)
-    h.assert_eq[USize](r.size(), 3)
-    h.assert_eq[String](r(0), "1")
-    h.assert_eq[String](r(1), "2")
-    h.assert_eq[String](r(2), "3  4")
-
-    r = "Hello there".split_in_place()
-    h.assert_eq[USize](r.size(), 2)
-    h.assert_eq[String](r(0), "Hello")
-    h.assert_eq[String](r(1), "there")
-
-    r = "Hello\tthere".split_in_place()
-    h.assert_eq[USize](r.size(), 2)
-    h.assert_eq[String](r(0), "Hello")
-    h.assert_eq[String](r(1), "there")
-
 
 class iso _TestStringJoin is UnitTest
   """
@@ -1220,6 +1179,48 @@ class iso _TestAddc is UnitTest
     h.assert_eq[Bool](expected._2, actual._2)
 
 
+class iso _TestNextPow2 is UnitTest
+  """
+  Test power of 2 computations.
+  """
+  fun name(): String => "builtin/NextPow2"
+
+  fun apply(h: TestHelper) =>
+    h.assert_eq[U8](32, U8(17).next_pow2())
+    h.assert_eq[U8](16, U8(16).next_pow2())
+    h.assert_eq[U8](1, U8(0).next_pow2())
+    h.assert_eq[U8](1, U8.max_value().next_pow2())
+
+    h.assert_eq[U16](32, U16(17).next_pow2())
+    h.assert_eq[U16](16, U16(16).next_pow2())
+    h.assert_eq[U16](1, U16(0).next_pow2())
+    h.assert_eq[U16](1, U16.max_value().next_pow2())
+
+    h.assert_eq[U32](32, U32(17).next_pow2())
+    h.assert_eq[U32](16, U32(16).next_pow2())
+    h.assert_eq[U32](1, U32(0).next_pow2())
+    h.assert_eq[U32](1, U32.max_value().next_pow2())
+
+    h.assert_eq[U64](32, U64(17).next_pow2())
+    h.assert_eq[U64](16, U64(16).next_pow2())
+    h.assert_eq[U64](1, U64(0).next_pow2())
+    h.assert_eq[U64](1, U64.max_value().next_pow2())
+
+    h.assert_eq[ULong](32, ULong(17).next_pow2())
+    h.assert_eq[ULong](16, ULong(16).next_pow2())
+    h.assert_eq[ULong](1, ULong(0).next_pow2())
+    h.assert_eq[ULong](1, ULong.max_value().next_pow2())
+
+    h.assert_eq[USize](32, USize(17).next_pow2())
+    h.assert_eq[USize](16, USize(16).next_pow2())
+    h.assert_eq[USize](1, USize(0).next_pow2())
+    h.assert_eq[USize](1, USize.max_value().next_pow2())
+
+    h.assert_eq[U128](32, U128(17).next_pow2())
+    h.assert_eq[U128](16, U128(16).next_pow2())
+    h.assert_eq[U128](1, U128(0).next_pow2())
+    h.assert_eq[U128](1, U128.max_value().next_pow2())
+
 struct _TestStruct
   var i: U32 = 0
   new create() => None
@@ -1260,96 +1261,3 @@ class iso _TestCCallback is UnitTest
     let cb: Callback = Callback
     let r = @pony_test_callback[I32](cb, addressof cb.apply, I32(3))
     h.assert_eq[I32](6, r)
-
-class iso _TestFormatSettingsInt is UnitTest
-  """
-  Test format settings
-  """
-  fun name(): String => "builtin/FormatSettingsInt"
-
-  fun apply(h: TestHelper) =>
-    h.assert_eq[String]("00010", U64(10)
-      .string(FormatSettingsInt.set_precision(5)))
-    h.assert_eq[String]("0x0000A", U64(10)
-      .string(FormatSettingsInt.set_precision(5).set_format(FormatHex)))
-    h.assert_eq[String]("0000A", U64(10)
-      .string(FormatSettingsInt.set_precision(5).set_format(FormatHexBare)))
-    h.assert_eq[String]("0x0000a", U64(10)
-      .string(FormatSettingsInt.set_precision(5).set_format(FormatHexSmall)))
-    h.assert_eq[String]("0000a", U64(10)
-      .string(FormatSettingsInt.set_precision(5)
-      .set_format(FormatHexSmallBare)))
-    h.assert_eq[String](" 0x0000A", U64(10)
-      .string(FormatSettingsInt.set_precision(5).set_format(FormatHex)
-      .set_width(8)))
-    h.assert_eq[String]("0x0000A ", U64(10)
-      .string(FormatSettingsInt.set_precision(5).set_format(FormatHex)
-      .set_width(8).set_align(AlignLeft)))
-    h.assert_eq[String]("   0000a", U64(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare).set_width(8)))
-    h.assert_eq[String]("0000a   ", U64(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare).set_width(8)
-      .set_align(AlignLeft)))
-
-    h.assert_eq[String]("-00010", I64(-10).string(FormatSettingsInt
-      .set_precision(5)))
-    h.assert_eq[String]("-0x0000A", I64(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHex)))
-    h.assert_eq[String]("-0000A", I64(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexBare)))
-    h.assert_eq[String]("-0x0000a", I64(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmall)))
-    h.assert_eq[String]("-0000a", I64(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare)))
-    h.assert_eq[String]("-0x0000A", I64(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHex).set_width(8)))
-    h.assert_eq[String]("-0x0000A", I64(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHex).set_width(8)
-      .set_align(AlignLeft)))
-    h.assert_eq[String]("  -0000a", I64(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare).set_width(8)))
-    h.assert_eq[String]("-0000a  ", I64(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare).set_width(8)
-      .set_align(AlignLeft)))
-
-    h.assert_eq[String]("00010", U128(10).string(FormatSettingsInt
-      .set_precision(5)))
-    h.assert_eq[String]("0x0000A", U128(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHex)))
-    h.assert_eq[String]("0000A", U128(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexBare)))
-    h.assert_eq[String]("0x0000a", U128(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmall)))
-    h.assert_eq[String]("0000a", U128(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare)))
-    h.assert_eq[String](" 0x0000A", U128(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHex).set_width(8)))
-    h.assert_eq[String]("0x0000A ", U128(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHex).set_width(8)
-      .set_align(AlignLeft)))
-    h.assert_eq[String]("   0000a", U128(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare).set_width(8)))
-    h.assert_eq[String]("0000a   ", U128(10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare).set_width(8)
-      .set_align(AlignLeft)))
-
-    h.assert_eq[String]("-00010", I128(-10).string(FormatSettingsInt
-      .set_precision(5)))
-    h.assert_eq[String]("-0x0000A", I128(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHex)))
-    h.assert_eq[String]("-0000A", I128(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexBare)))
-    h.assert_eq[String]("-0x0000a", I128(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmall)))
-    h.assert_eq[String]("-0000a", I128(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare)))
-    h.assert_eq[String]("-0x0000A", I128(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHex).set_width(8)))
-    h.assert_eq[String]("-0x0000A", I128(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHex).set_width(8)
-      .set_align(AlignLeft)))
-    h.assert_eq[String]("  -0000a", I128(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare).set_width(8)))
-    h.assert_eq[String]("-0000a  ", I128(-10).string(FormatSettingsInt
-      .set_precision(5).set_format(FormatHexSmallBare).set_width(8)
-      .set_align(AlignLeft)))

@@ -1,3 +1,5 @@
+#define PONY_WANT_ATOMIC_DEFS
+
 #include "scheduler.h"
 #include "cpu.h"
 #include "mpmcq.h"
@@ -25,7 +27,7 @@ typedef enum
 // Scheduler global data.
 static uint32_t scheduler_count;
 static scheduler_t* scheduler;
-static ATOMIC_TYPE(bool) detect_quiescence;
+static PONY_ATOMIC(bool) detect_quiescence;
 static bool use_yield;
 static mpmcq_t inject;
 static __pony_thread_local scheduler_t* this_scheduler;
@@ -62,6 +64,7 @@ static pony_actor_t* pop_global(scheduler_t* sched)
 /**
  * Sends a message to a thread.
  */
+
 static void send_msg(uint32_t to, sched_msg_t msg, intptr_t arg)
 {
   pony_msgi_t* m = (pony_msgi_t*)pony_alloc_msg(
@@ -129,11 +132,13 @@ static void read_msg(scheduler_t* sched)
   }
 }
 
+
 /**
  * If we can terminate, return true. If all schedulers are waiting, one of
  * them will stop the ASIO back end and tell the cycle detector to try to
  * terminate.
  */
+
 static bool quiescent(scheduler_t* sched, uint64_t tsc, uint64_t tsc2)
 {
   read_msg(sched);
@@ -165,17 +170,22 @@ static bool quiescent(scheduler_t* sched, uint64_t tsc, uint64_t tsc2)
   return false;
 }
 
+
+
 static scheduler_t* choose_victim(scheduler_t* sched)
 {
   scheduler_t* victim = sched->last_victim;
 
   while(true)
   {
+    // Schedulers are laid out sequentially in memory
+
     // Back up one.
     victim--;
 
-    // Wrap around to the end.
     if(victim < scheduler)
+      // victim is before the first scheduler location
+      // wrap around to the end.
       victim = &scheduler[scheduler_count - 1];
 
     if(victim == sched->last_victim)
@@ -197,6 +207,7 @@ static scheduler_t* choose_victim(scheduler_t* sched)
 
   return NULL;
 }
+
 
 /**
  * Use mpmcqs to allow stealing directly from a victim, without waiting for a
@@ -320,60 +331,12 @@ static void ponyint_sched_shutdown()
 
   ponyint_cycle_terminate(&scheduler[0].ctx);
 
-#ifdef USE_TELEMETRY
-  printf("\"telemetry\": [\n");
-#endif
-
   for(uint32_t i = 0; i < scheduler_count; i++)
   {
     while(ponyint_messageq_pop(&scheduler[i].mq) != NULL);
     ponyint_messageq_destroy(&scheduler[i].mq);
     ponyint_mpmcq_destroy(&scheduler[i].q);
-
-#ifdef USE_TELEMETRY
-    pony_ctx_t* ctx = &scheduler[i].ctx;
-
-    printf(
-      "  {\n"
-      "    \"count_gc_passes\": " __zu ",\n"
-      "    \"count_alloc\": " __zu ",\n"
-      "    \"count_alloc_size\": " __zu ",\n"
-      "    \"count_alloc_actors\": " __zu ",\n"
-      "    \"count_msg_app\": " __zu ",\n"
-      "    \"count_msg_block\": " __zu ",\n"
-      "    \"count_msg_unblock\": " __zu ",\n"
-      "    \"count_msg_acquire\": " __zu ",\n"
-      "    \"count_msg_release\": " __zu ",\n"
-      "    \"count_msg_conf\": " __zu ",\n"
-      "    \"count_msg_ack\": " __zu ",\n"
-      "    \"time_in_gc\": " __zu ",\n"
-      "    \"time_in_send_scan\": " __zu ",\n"
-      "    \"time_in_recv_scan\": " __zu "\n"
-      "  }",
-      ctx->count_gc_passes,
-      ctx->count_alloc,
-      ctx->count_alloc_size,
-      ctx->count_alloc_actors,
-      ctx->count_msg_app,
-      ctx->count_msg_block,
-      ctx->count_msg_unblock,
-      ctx->count_msg_acquire,
-      ctx->count_msg_release,
-      ctx->count_msg_conf,
-      ctx->count_msg_ack,
-      ctx->time_in_gc,
-      ctx->time_in_send_scan,
-      ctx->time_in_recv_scan
-      );
-
-    if(i < (scheduler_count - 1))
-      printf(",\n");
-#endif
   }
-
-#ifdef USE_TELEMETRY
-  printf("\n]\n");
-#endif
 
   ponyint_pool_free_size(scheduler_count * sizeof(scheduler_t), scheduler);
   scheduler = NULL;

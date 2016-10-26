@@ -7,7 +7,7 @@
 
 PONY_EXTERN_C_BEGIN
 
-ast_result_t expr_ffi(pass_opt_t* opt, ast_t* ast);
+bool expr_ffi(pass_opt_t* opt, ast_t* ast);
 
 PONY_EXTERN_C_END
 

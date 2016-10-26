@@ -48,16 +48,26 @@ class SSLConnection is TCPConnectionNotify
     Pass the data to the SSL session and check for both new application data
     and new destination data.
     """
+    let notified = _notify.sent(conn, data)
     if _connected then
       try
-        _ssl.write(data)
+        _ssl.write(notified)
+      else
+        return ""
       end
     else
-      _pending.push(data)
+      _pending.push(notified)
     end
 
     _poll(conn)
     ""
+
+  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter =>
+    for bytes in data.values() do
+      sent(conn, bytes)
+    end
+
+  recover val Array[ByteSeq] end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     """

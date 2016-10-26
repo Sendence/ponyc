@@ -16,9 +16,8 @@ actor Main is TestList
     test(_TestPathBase)
     test(_TestPathExt)
     test(_TestPathVolume)
-    test(_TestFileOpenError)
     test(_TestFileEOF)
-    
+
 primitive _FileHelper
   fun make_files(h: TestHelper, files: Array[String]): FilePath? =>
     let top = Directory(FilePath.mkdtemp(h.env.root as AmbientAuth,
@@ -246,30 +245,6 @@ class iso _TestPathVolume is UnitTest
       h.assert_eq[String](res2, "")
     end
 
-class iso _TestFileOpenError is UnitTest
-  fun name(): String => "files/File.open-error"
-  fun apply(h: TestHelper) =>
-    let path = "tmp.readonly"
-    try
-      let filepath = FilePath(h.env.root as AmbientAuth, path)
-      let file1 = File(filepath)
-      file1.dispose()
-      // take away write permissions
-      let m = I32(292) // file mode 444
-      let chmod_result = ifdef windows then
-          0 == @_chmod[I32](path.null_terminated().cstring(), m)
-        else
-          0 == @chmod[I32](path.null_terminated().cstring(), m)
-        end
-      // Commenting out until this is resolved upstream:
-      // see: https://github.com/ponylang/ponyc/issues/1261
-      //
-      // try to open file for writing
-      // let file2 = File(filepath)
-      // h.assert_true(file2.errno() is FilePermissionDenied)
-      // h.assert_false(file2.valid())
-      filepath.remove()
-    end
 
 class iso _TestFileEOF is UnitTest
   fun name(): String => "files/File.eof-error"
