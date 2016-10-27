@@ -215,7 +215,7 @@ static scheduler_t* choose_victim(scheduler_t* sched)
  */
 static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
 {
-  send_msg(0, SCHED_BLOCK, 0);
+  //send_msg(0, SCHED_BLOCK, 0);
   uint64_t tsc = ponyint_cpu_tick();
   pony_actor_t* actor;
 
@@ -246,7 +246,7 @@ static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
     }
   }
 
-  send_msg(0, SCHED_UNBLOCK, 0);
+  //send_msg(0, SCHED_UNBLOCK, 0);
   return actor;
 }
 
@@ -267,6 +267,7 @@ static void run(scheduler_t* sched)
       if(actor == NULL)
       {
         // Termination.
+        print("Scheduler Terminated at point 1\n");
         assert(pop(sched) == NULL);
         return;
       }
@@ -291,6 +292,7 @@ static void run(scheduler_t* sched)
 
         if(next == NULL)
         {
+          print("Scheduler Terminated at point 2\n");
           // Termination.
           return;
         }
