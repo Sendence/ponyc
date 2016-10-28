@@ -385,7 +385,6 @@ actor TCPConnection
       end
 
       if AsioEvent.readable(flags) then
-        @printf[None]("readable received\n".cstring())
         _readable = true
         _complete_reads(arg)
         _pending_reads()
@@ -604,7 +603,6 @@ actor TCPConnection
           match len
           | 0 =>
             // Would block, try again later.
-            @printf[None]("Not readable\n".cstring())
             _readable = false
             return
           | _next_size =>
