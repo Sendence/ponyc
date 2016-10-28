@@ -385,6 +385,7 @@ actor TCPConnection
       end
 
       if AsioEvent.readable(flags) then
+        @printf[None]("readable received\n".cstring())
         _readable = true
         _complete_reads(arg)
         _pending_reads()
@@ -602,6 +603,7 @@ actor TCPConnection
           match len
           | 0 =>
             // Would block, try again later.
+            @printf[None]("Not readable\n".cstring())
             _readable = false
             return
           | _next_size =>
@@ -635,6 +637,7 @@ actor TCPConnection
         end
       else
         // The socket has been closed from the other side.
+        @printf[None]("socket shutting down\n".cstring())
         _shutdown_peer = true
         close()
       end
@@ -721,6 +724,7 @@ actor TCPConnection
     _shutdown_peer = true
 
     ifdef not windows then
+      @printf[None]("hard close\n".cstring())
       // Unsubscribe immediately and drop all pending writes.
       @pony_asio_event_unsubscribe(_event)
       _pending.clear()
