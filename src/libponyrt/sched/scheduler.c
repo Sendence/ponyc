@@ -267,7 +267,7 @@ static void run(scheduler_t* sched)
       if(actor == NULL)
       {
         // Termination.
-        print("Scheduler Terminated at point 1\n");
+        printf("Scheduler Terminated at point 1\n");
         assert(pop(sched) == NULL);
         return;
       }
@@ -292,7 +292,7 @@ static void run(scheduler_t* sched)
 
         if(next == NULL)
         {
-          print("Scheduler Terminated at point 2\n");
+          printf("Scheduler Terminated at point 2\n");
           // Termination.
           return;
         }
