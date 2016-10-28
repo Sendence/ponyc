@@ -379,7 +379,6 @@ actor TCPConnection
     else
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
-        @printf[None]("writeable received\n".cstring())
         _writeable = true
         _complete_writes(arg)
         _pending_writes()
