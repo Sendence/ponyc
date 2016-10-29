@@ -174,7 +174,7 @@ actor TCPConnection
 
   new create(auth: TCPConnectionAuth, notify: TCPConnectionNotify iso,
     host: String, service: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16384)
+    max_size: USize = 16777216)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
