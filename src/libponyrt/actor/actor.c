@@ -331,8 +331,17 @@ void pony_sendv(pony_ctx_t* ctx, pony_actor_t* to, pony_msg_t* m)
 
   if(ponyint_messageq_push(&to->q, m))
   {
-    if(!has_flag(to, FLAG_UNSCHEDULED))
-      ponyint_sched_add(ctx, to);
+    if(!has_flag(to, FLAG_UNSCHEDULED)) {
+      if (ctx->scheduler != NULL) {
+        scheduler_t* sched = random_scheduler();
+
+        ponyint_sched_add(sched, to);
+      }
+      else
+      {
+        ponyint_sched_add(ctx->scheduler, to);
+      }
+    }
   }
 }
 
@@ -414,7 +423,7 @@ void pony_schedule(pony_ctx_t* ctx, pony_actor_t* actor)
     return;
 
   unset_flag(actor, FLAG_UNSCHEDULED);
-  ponyint_sched_add(ctx, actor);
+  ponyint_sched_add(ctx->scheduler, actor);
 }
 
 void pony_unschedule(pony_ctx_t* ctx, pony_actor_t* actor)
