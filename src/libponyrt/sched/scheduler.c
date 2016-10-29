@@ -10,8 +10,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-#include <time.h>
-#include <stdlib.h>
 
 #define SCHED_BATCH 100
 
@@ -47,7 +45,7 @@ static pony_actor_t* pop(scheduler_t* sched)
  */
 static void push(scheduler_t* sched, pony_actor_t* actor)
 {
-  ponyint_mpmcq_push(&sched->q, actor);
+  ponyint_mpmcq_push_single(&sched->q, actor);
 }
 
 /**
@@ -175,13 +173,7 @@ static bool quiescent(scheduler_t* sched, uint64_t tsc, uint64_t tsc2)
   return false;
 }
 
-scheduler_t* random_scheduler()
-{
-    srand((unsigned int)time(NULL));
-    int r = rand() % ponyint_sched_cores();
 
-    return &scheduler[scheduler_count - 1 - r];
-}
 
 static scheduler_t* choose_victim(scheduler_t* sched)
 {
@@ -427,12 +419,12 @@ void ponyint_sched_stop()
   ponyint_sched_shutdown();
 }
 
-void ponyint_sched_add(scheduler_t* sched, pony_actor_t* actor)
+void ponyint_sched_add(pony_ctx_t* ctx, pony_actor_t* actor)
 {
-  if(sched != NULL)
+  if(ctx->scheduler != NULL)
   {
     // Add to the current scheduler thread.
-    push(sched, actor);
+    push(ctx->scheduler, actor);
   } else {
     // Put on the shared mpmcq.
     ponyint_mpmcq_push(&inject, actor);
