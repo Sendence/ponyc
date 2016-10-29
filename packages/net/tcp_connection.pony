@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -159,7 +160,9 @@ actor TCPConnection
   var _shutdown_peer: Bool = false
   var _in_sent: Bool = false
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
+
   var _read_buf: Array[U8] iso
+  var _expect_read_buf: Reader = Reader
 
   var _next_size: USize
   let _max_size: USize
@@ -311,7 +314,7 @@ actor TCPConnection
     """
     if not _in_sent then
       _expect = _notify.expect(this, qty)
-      _read_buf_size()
+      //_read_buf_size()
     end
 
   fun ref set_nodelay(state: Bool) =>
@@ -556,11 +559,11 @@ actor TCPConnection
     """
     Resize the read buffer.
     """
-    if _expect != 0 then
-      _read_buf.undefined(_expect)
-    else
+    //if _expect != 0 then
+    //  _read_buf.undefined(_expect)
+    //else
       _read_buf.undefined(_next_size)
-    end
+    //end
 
   fun ref _queue_read() =>
     """
@@ -593,6 +596,17 @@ actor TCPConnection
             return
           end
 
+          if _expect != 0 then
+            while _expect_read_buf.size() >= _expect do
+              let out = _expect_read_buf.block(_expect)
+
+              if not _notify.received(this, consume out) then
+                _read_again()
+                return
+              end
+            end
+          end
+
           // Read as much data as possible.
           let len = @pony_os_recv[USize](
             _event,
@@ -611,7 +625,25 @@ actor TCPConnection
 
           _read_len = _read_len + len
 
-          if _read_len >= _expect then
+          if _expect != 0 then
+            let data = _read_buf = recover Array[U8] end
+            data.truncate(_read_len)
+            _read_len = 0
+
+            _expect_read_buf.append(consume data)
+
+            while _expect_read_buf.size() >= _expect do
+              let out = _expect_read_buf.block(_expect)
+
+              if not _notify.received(this, consume out) then
+                _read_buf_size()
+                _read_again()
+                return
+              end
+            end
+
+            _read_buf_size()
+          else
             let data = _read_buf = recover Array[U8] end
             data.truncate(_read_len)
             _read_len = 0
