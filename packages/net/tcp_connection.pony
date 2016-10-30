@@ -314,7 +314,6 @@ actor TCPConnection
     """
     if not _in_sent then
       _expect = _notify.expect(this, qty)
-      //_read_buf_size()
     end
 
   fun ref set_nodelay(state: Bool) =>
@@ -561,11 +560,15 @@ actor TCPConnection
     """
     Resize the read buffer.
     """
-    //if _expect != 0 then
-    //  _read_buf.undefined(_expect)
-    //else
+    ifdef windows then
+      if _expect != 0 then
+        _read_buf.undefined(_expect)
+      else
+        _read_buf.undefined(_next_size)
+      end
+    else
       _read_buf.undefined(_next_size)
-    //end
+    end
 
   fun ref _queue_read() =>
     """
@@ -598,10 +601,15 @@ actor TCPConnection
             return
           end
 
-          if _expect != 0 then
+          if _expect_read_buf.size() > 1 then
             while _expect_read_buf.size() >= _expect do
-              let out = _expect_read_buf.block(_expect)
+              let block_size = if _expect != 0 then
+                _expect
+              else
+                _expect_read_buf.size()
+              end
 
+              let out = _expect_read_buf.block(block_size)
               if not _notify.received(this, consume out) then
                 _read_again()
                 return
