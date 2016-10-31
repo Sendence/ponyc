@@ -409,11 +409,11 @@ actor TCPConnection
           _pending_writes()
           ifdef linux then
             if _one_shot then
-              @pony_asio_event_resubscribe(event)
+              @pony_asio_event_resubscribe_read(event)
               try
                 (let a, let b) = remote_address().name(None, true)
                 (let c, let d) = local_address().name(None, true)
-                @printf[None]("resubscribe, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
+                @printf[None]("resubscribe read, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
               end
             end
           end
@@ -669,7 +669,7 @@ actor TCPConnection
             ifdef linux then
               if _one_shot then
                 @printf[None]("resubscribing to reads\n".cstring())
-                @pony_asio_event_resubscribe(_event)
+                @pony_asio_event_resubscribe_read(_event)
               end
             end
             return
