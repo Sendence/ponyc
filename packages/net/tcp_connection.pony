@@ -412,12 +412,11 @@ actor TCPConnection
     else
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
-          /*try
+          try
                   (let a, let b) = remote_address().name(None, true)
                   (let c, let d) = local_address().name(None, true)
                   @printf[None]("writeable event: %s %s\n".cstring(), b.cstring(), d.cstring())
           end
-          */
           _writeable = true
           _complete_writes(arg)
           _pending_writes()
@@ -610,6 +609,7 @@ actor TCPConnection
       _queue_read()
     end
 
+/*
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
@@ -620,6 +620,17 @@ actor TCPConnection
       else
         _read_buf.undefined(_next_size)
       end
+    else
+      _read_buf.undefined(_next_size)
+    end
+    */
+
+  fun ref _read_buf_size() =>
+    """
+    Resize the read buffer.
+    """
+    if _expect != 0 then
+      _read_buf.undefined(_expect)
     else
       _read_buf.undefined(_next_size)
     end
@@ -639,6 +650,7 @@ actor TCPConnection
       end
     end
 
+/*
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,
@@ -724,6 +736,60 @@ actor TCPConnection
             else
               _read_buf_size()
             end
+          end
+
+          sum = sum + len
+
+          if sum >= _max_size then
+            // If we've read _max_size, yield and read again later.
+            _read_again()
+            return
+          end
+        end
+      else
+        // The socket has been closed from the other side.
+        _shutdown_peer = true
+        close()
+      end
+    end
+*/
+
+  fun ref _pending_reads() =>
+    """
+    Read while data is available, guessing the next packet length as we go. If
+    we read 4 kb of data, send ourself a resume message and stop reading, to
+    avoid starving other actors.
+    """
+    ifdef not windows then
+      try
+        var sum: USize = 0
+
+        while _readable and not _shutdown_peer do
+          // Read as much data as possible.
+          let len = @pony_os_recv[USize](
+            _event,
+            _read_buf.cstring().usize() + _read_len,
+            _read_buf.size() - _read_len) ?
+
+          match len
+          | 0 =>
+            // Would block, try again later.
+            _readable = false
+            return
+          | _next_size =>
+            // Increase the read buffer size.
+            _next_size = _max_size.min(_next_size * 2)
+          end
+
+          _read_len = _read_len + len
+
+          if _read_len >= _expect then
+            let data = _read_buf = recover Array[U8] end
+            data.truncate(_read_len)
+            _read_len = 0
+
+            _notify.received(this, consume data)
+            _read_buf_size()
           end
 
           sum = sum + len
