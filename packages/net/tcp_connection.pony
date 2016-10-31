@@ -439,18 +439,18 @@ actor TCPConnection
       end
 
       if AsioEvent.readable(flags) then
-        if not _readable then
+        //if not _readable then
           //@printf[None]("readable\n".cstring())
           _readable = true
           _complete_reads(arg)
           _pending_reads()
-        else
+        /*else
           try
             (let a, let b) = remote_address().name(None, true)
             (let c, let d) = local_address().name(None, true)
             @printf[None]("readable, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
           end
-        end
+        end*/
       end
 
       if AsioEvent.disposable(flags) then
@@ -568,7 +568,7 @@ actor TCPConnection
             // Send remaining data later.
             node() = (data, offset + len)
             _writeable = false
-            @printf[None]("writeable is false\n".cstring())
+            //@printf[None]("writeable is false\n".cstring())
           else
             // This chunk has been fully sent.
             _pending.shift()
