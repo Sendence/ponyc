@@ -204,11 +204,6 @@ void pony_asio_event_subscribe(asio_event_t* ev)
   ep.data.ptr = ev;
   ep.events = EPOLLRDHUP | EPOLLET;
 
-  if(ev->flags & ASIO_ONESHOT) {
-    printf("SETTING ONESHOT\n");
-    ep.events |= EPOLLONESHOT;
-  }
-
   if(ev->flags & ASIO_READ)
     ep.events |= EPOLLIN;
 
@@ -237,6 +232,10 @@ void pony_asio_event_subscribe(asio_event_t* ev)
     } else {
       return;
     }
+  }
+
+  if(ev->flags & ASIO_ONESHOT) {
+    ep.events |= EPOLLONESHOT;
   }
 
   epoll_ctl(b->epfd, EPOLL_CTL_ADD, ev->fd, &ep);
@@ -312,7 +311,7 @@ void pony_asio_event_resubscribe(asio_event_t* ev)
 
   struct epoll_event ep;
   ep.data.ptr = ev;
-  ep.events = EPOLLRDHUP;
+  ep.events = EPOLLRDHUP | EPOLLET;
 
   if(ev->flags & ASIO_ONESHOT)
     ep.events |= EPOLLONESHOT;

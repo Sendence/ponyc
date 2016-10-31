@@ -376,6 +376,9 @@ actor TCPConnection
             ifdef linux then
               if _one_shot then
                 @pony_asio_event_resubscribe(event)
+                (let a, let b) = remote_address().name(None, true)
+                (let c, let d) = local_address().name(None, true)
+                @printf[None]("resubscribe, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
               end
             end
           else
@@ -405,6 +408,9 @@ actor TCPConnection
           ifdef linux then
             if _one_shot then
               @pony_asio_event_resubscribe(event)
+              (let a, let b) = remote_address().name(None, true)
+              (let c, let d) = local_address().name(None, true)
+                @printf[None]("resubscribe, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
             end
           end
       end
