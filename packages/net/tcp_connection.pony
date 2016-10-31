@@ -770,6 +770,7 @@ actor TCPConnection
             _readable = false
             ifdef linux then
               if _one_shot then
+                @printf[None]("resub\n".cstring())
                 @pony_asio_event_resubscribe_read(_event)
               end
             end
