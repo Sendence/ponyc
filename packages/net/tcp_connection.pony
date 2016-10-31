@@ -363,13 +363,13 @@ actor TCPConnection
           // We don't have a connection yet.
           if @pony_os_connected[Bool](fd) then
             // The connection was successful, make it ours.
-            if (_fd != fd) {
+            if (_fd != fd) then
               try
                 (let a, let b) = remote_address().name(None, true)
                 (let c, let d) = local_address().name(None, true)
                 @printf[None]("socket fds not equal, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
               end
-            }
+            end
             _fd = fd
             _event = event
             _connected = true
