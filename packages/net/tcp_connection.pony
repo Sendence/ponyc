@@ -770,7 +770,7 @@ actor TCPConnection
           // Read as much data as possible.
           let len = @pony_os_recv[USize](
             _event,
-            _read_buf.cstring().usize() + _read_len,
+            _read_buf.cpointer().usize() + _read_len,
             _read_buf.size() - _read_len) ?
 
           match len
