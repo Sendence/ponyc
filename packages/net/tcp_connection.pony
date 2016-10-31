@@ -249,6 +249,7 @@ actor TCPConnection
     Write a single sequence of bytes.
     """
     if _one_shot then
+      @printf[None]("one shot write\n")
       return
     end
 
@@ -263,6 +264,7 @@ actor TCPConnection
     Write a sequence of sequences of bytes.
     """
     if _one_shot then
+      @printf[None]("one shot write\n")
       return
     end
 
@@ -371,9 +373,11 @@ actor TCPConnection
             // Don't call _complete_writes, as Windows will see this as a
             // closed connection.
             _pending_writes()
-            //ifdef linux then
-            //  @pony_asio_event_resubscribe(event)
-            //end
+            ifdef linux then
+              if _one_shot then
+                @pony_asio_event_resubscribe(event)
+              end
+            end
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -398,9 +402,11 @@ actor TCPConnection
           _writeable = true
           _complete_writes(arg)
           _pending_writes()
-          //ifdef linux then
-          //  @pony_asio_event_resubscribe(event)
-          //end
+          ifdef linux then
+            if _one_shot then
+              @pony_asio_event_resubscribe(event)
+            end
+          end
       end
 
       if AsioEvent.readable(flags) then
@@ -645,7 +651,9 @@ actor TCPConnection
             // Would block, try again later.
             _readable = false
             ifdef linux then
-              @pony_asio_event_resubscribe(_event)
+              if _one_shot then
+                @pony_asio_event_resubscribe(_event)
+              end
             end
             return
           | _next_size =>
