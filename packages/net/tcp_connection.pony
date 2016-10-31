@@ -427,6 +427,7 @@ actor TCPConnection
 
       if AsioEvent.readable(flags) then
         if not _readable then
+          @printf[None]("readable\n".cstring())
           _readable = true
           _complete_reads(arg)
           _pending_reads()
