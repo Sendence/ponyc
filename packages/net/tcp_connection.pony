@@ -249,11 +249,6 @@ actor TCPConnection
     """
     Write a single sequence of bytes.
     """
-    if _one_shot then
-      @printf[None]("one shot write\n")
-      return
-    end
-
     if not _closed then
       _in_sent = true
       write_final(_notify.sent(this, data))
@@ -264,10 +259,6 @@ actor TCPConnection
     """
     Write a sequence of sequences of bytes.
     """
-    if _one_shot then
-      @printf[None]("one shot write\n")
-      return
-    end
 
     if not _closed then
       _in_sent = true
