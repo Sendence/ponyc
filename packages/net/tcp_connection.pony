@@ -172,10 +172,11 @@ actor TCPConnection
   var _expect: USize = 0
 
   var _muted: Bool = false
+  var _one_shot: Bool = false
 
   new create(auth: TCPConnectionAuth, notify: TCPConnectionNotify iso,
     host: String, service: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16777216)
+    max_size: USize = 16384)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
@@ -228,6 +229,7 @@ actor TCPConnection
     """
     A new connection accepted on a server.
     """
+    _one_shot = true
     _listen = listen
     _notify = consume notify
     _connect_count = 0
@@ -246,6 +248,10 @@ actor TCPConnection
     """
     Write a single sequence of bytes.
     """
+    if _one_shot then
+      return
+    end
+
     if not _closed then
       _in_sent = true
       write_final(_notify.sent(this, data))
@@ -256,6 +262,10 @@ actor TCPConnection
     """
     Write a sequence of sequences of bytes.
     """
+    if _one_shot then
+      return
+    end
+
     if not _closed then
       _in_sent = true
 
@@ -361,9 +371,9 @@ actor TCPConnection
             // Don't call _complete_writes, as Windows will see this as a
             // closed connection.
             _pending_writes()
-            ifdef linux then
-              @pony_asio_event_resubscribe(event)
-            end
+            //ifdef linux then
+            //  @pony_asio_event_resubscribe(event)
+            //end
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -388,9 +398,9 @@ actor TCPConnection
           _writeable = true
           _complete_writes(arg)
           _pending_writes()
-          ifdef linux then
-            @pony_asio_event_resubscribe(event)
-          end
+          //ifdef linux then
+          //  @pony_asio_event_resubscribe(event)
+          //end
       end
 
       if AsioEvent.readable(flags) then
