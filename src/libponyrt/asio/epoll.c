@@ -125,6 +125,7 @@ DECLARE_THREAD_FN(ponyint_asio_backend_dispatch)
       uint32_t flags = 0;
       uint32_t count = 0;
 
+
       if(ev->flags & ASIO_READ)
       {
         if(ep->events & (EPOLLIN | EPOLLRDHUP | EPOLLHUP | EPOLLERR))
@@ -201,6 +202,9 @@ void pony_asio_event_subscribe(asio_event_t* ev)
   struct epoll_event ep;
   ep.data.ptr = ev;
   ep.events = EPOLLRDHUP | EPOLLET;
+
+  if(ev->flags & ASIO_ONESHOT)
+    ep.events |= EPOLLONESHOT;
 
   if(ev->flags & ASIO_READ)
     ep.events |= EPOLLIN;
@@ -292,6 +296,31 @@ void pony_asio_event_unsubscribe(asio_event_t* ev)
 
   ev->flags = ASIO_DISPOSABLE;
   send_request(ev, ASIO_DISPOSABLE);
+}
+
+void pony_asio_event_resubscribe(asio_event_t* ev)
+{
+  if((ev == NULL) ||
+    (ev->flags == ASIO_DISPOSABLE) ||
+    (ev->flags == ASIO_DESTROYED))
+    return;
+
+  asio_backend_t* b = ponyint_asio_get_backend();
+
+  struct epoll_event ep;
+  ep.data.ptr = ev;
+  ep.events = EPOLLRDHUP;
+
+  if(ev->flags & ASIO_ONESHOT)
+    ep.events |= EPOLLONESHOT;
+
+  if(ev->flags & ASIO_READ)
+    ep.events |= EPOLLIN;
+
+  if(ev->flags & ASIO_WRITE)
+    ep.events |= EPOLLOUT;
+
+  epoll_ctl(b->epfd, EPOLL_CTL_MOD, ev->fd, &ep);
 }
 
 #endif

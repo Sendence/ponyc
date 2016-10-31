@@ -5,6 +5,7 @@ use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
+use @pony_asio_event_resubscribe[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 type TCPConnectionAuth is (AmbientAuth | NetAuth | TCPAuth | TCPConnectAuth)
@@ -231,7 +232,7 @@ actor TCPConnection
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write(), 0, true)
+    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write_oneshot(), 0, true)
     _connected = true
     _writeable = true
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -360,6 +361,9 @@ actor TCPConnection
             // Don't call _complete_writes, as Windows will see this as a
             // closed connection.
             _pending_writes()
+            ifdef linux then
+              @pony_asio_event_resubscribe(event)
+            end
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -381,9 +385,14 @@ actor TCPConnection
     else
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
-        _writeable = true
-        _complete_writes(arg)
-        _pending_writes()
+        if not _writeable then
+          _writeable = true
+          _complete_writes(arg)
+          _pending_writes()
+          ifdef linux then
+            @pony_asio_event_resubscribe(event)
+          end
+        end
       end
 
       if AsioEvent.readable(flags) then
@@ -391,6 +400,9 @@ actor TCPConnection
           _readable = true
           _complete_reads(arg)
           _pending_reads()
+          ifdef linux then
+            @pony_asio_event_resubscribe(event)
+          end
         end
       end
 
