@@ -319,7 +319,20 @@ actor TCPConnection
     """
     if not _in_sent then
       _expect = _notify.expect(this, qty)
+      _read_buf_size()
     end
+
+/*
+  fun ref expect(qty: USize = 0) =>
+    """
+    A `received` call on the notifier must contain exactly `qty` bytes. If
+    `qty` is zero, the call can contain any amount of data. This has no effect
+    if called in the `sent` notifier callback.
+    """
+    if not _in_sent then
+      _expect = _notify.expect(this, qty)
+    end
+*/
 
   fun ref set_nodelay(state: Bool) =>
     """
@@ -603,7 +616,7 @@ actor TCPConnection
       _queue_read()
     end
 
-
+/*
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
@@ -617,8 +630,9 @@ actor TCPConnection
     else
       _read_buf.undefined(_next_size)
     end
+*/
 
-/*
+
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
@@ -628,7 +642,7 @@ actor TCPConnection
     else
       _read_buf.undefined(_next_size)
     end
-*/
+
 
   fun ref _queue_read() =>
     """
@@ -645,7 +659,7 @@ actor TCPConnection
       end
     end
 
-
+/*
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,
@@ -747,20 +761,25 @@ actor TCPConnection
         close()
       end
     end
+*/
 
 
-/*
   fun ref _pending_reads() =>
     """
-    Read while data is available, guessing the next packet length as we go. If
-    we read 4 kb of data, send ourself a resume message and stop reading, to
-    avoid starving other actors.
+    Unless this connection is currently muted, read while data is available,
+    guessing the next packet length as we go. If we read 4 kb of data, send
+    ourself a resume message and stop reading, to avoid starving other actors.
     """
     ifdef not windows then
       try
         var sum: USize = 0
 
         while _readable and not _shutdown_peer do
+          if _muted then
+            _read_again()
+            return
+          end
+
           // Read as much data as possible.
           let len = @pony_os_recv[USize](
             _event,
@@ -771,12 +790,6 @@ actor TCPConnection
           | 0 =>
             // Would block, try again later.
             _readable = false
-            ifdef linux then
-              if _one_shot then
-                //@printf[None]("resub\n".cstring())
-                @pony_asio_event_resubscribe_read(_event)
-              end
-            end
             return
           | _next_size =>
             // Increase the read buffer size.
@@ -790,8 +803,13 @@ actor TCPConnection
             data.truncate(_read_len)
             _read_len = 0
 
-            _notify.received(this, consume data)
-            _read_buf_size()
+            if not _notify.received(this, consume data) then
+              _read_buf_size()
+              _read_again()
+              return
+            else
+              _read_buf_size()
+            end
           end
 
           sum = sum + len
@@ -808,7 +826,7 @@ actor TCPConnection
         close()
       end
     end
-    */
+
 
   fun ref _notify_connecting() =>
     """
