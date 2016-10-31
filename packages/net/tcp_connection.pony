@@ -603,7 +603,7 @@ actor TCPConnection
       _queue_read()
     end
 
-/*
+
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
@@ -617,8 +617,8 @@ actor TCPConnection
     else
       _read_buf.undefined(_next_size)
     end
-    */
 
+/*
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
@@ -628,6 +628,7 @@ actor TCPConnection
     else
       _read_buf.undefined(_next_size)
     end
+*/
 
   fun ref _queue_read() =>
     """
@@ -644,7 +645,7 @@ actor TCPConnection
       end
     end
 
-/*
+
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,
@@ -746,8 +747,9 @@ actor TCPConnection
         close()
       end
     end
-*/
 
+
+/*
   fun ref _pending_reads() =>
     """
     Read while data is available, guessing the next packet length as we go. If
@@ -806,6 +808,7 @@ actor TCPConnection
         close()
       end
     end
+    */
 
   fun ref _notify_connecting() =>
     """
