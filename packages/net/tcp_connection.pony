@@ -412,11 +412,12 @@ actor TCPConnection
     else
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
-          try
+          /*try
                   (let a, let b) = remote_address().name(None, true)
                   (let c, let d) = local_address().name(None, true)
                   @printf[None]("writeable event: %s %s\n".cstring(), b.cstring(), d.cstring())
           end
+          */
           _writeable = true
           _complete_writes(arg)
           _pending_writes()
@@ -561,6 +562,7 @@ actor TCPConnection
             // Send remaining data later.
             node() = (data, offset + len)
             _writeable = false
+            @printf[None]("writeable is false\n".cstring())
           else
             // This chunk has been fully sent.
             _pending.shift()
