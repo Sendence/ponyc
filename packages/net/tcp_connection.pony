@@ -415,9 +415,11 @@ actor TCPConnection
           _complete_reads(arg)
           _pending_reads()
         else
-          (let a, let b) = remote_address().name(None, true)
-          (let c, let d) = local_address().name(None, true)
-          @printf[None]("readable, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
+          try
+            (let a, let b) = remote_address().name(None, true)
+            (let c, let d) = local_address().name(None, true)
+            @printf[None]("readable, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
+          end
         end
       end
 
