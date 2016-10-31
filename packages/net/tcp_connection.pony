@@ -790,6 +790,11 @@ actor TCPConnection
           | 0 =>
             // Would block, try again later.
             _readable = false
+            ifdef linux then
+              if _one_shot then
+                @pony_asio_event_resubscribe_read(_event)
+              end
+            end
             return
           | _next_size =>
             // Increase the read buffer size.
