@@ -410,11 +410,11 @@ actor TCPConnection
       end
 
       if AsioEvent.readable(flags) then
-        if not _readable then
+        //if not _readable then
           _readable = true
           _complete_reads(arg)
           _pending_reads()
-        end
+        //end
       end
 
       if AsioEvent.disposable(flags) then
