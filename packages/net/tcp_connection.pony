@@ -427,7 +427,7 @@ actor TCPConnection
 
       if AsioEvent.readable(flags) then
         if not _readable then
-          @printf[None]("readable\n".cstring())
+          //@printf[None]("readable\n".cstring())
           _readable = true
           _complete_reads(arg)
           _pending_reads()
@@ -771,7 +771,7 @@ actor TCPConnection
             _readable = false
             ifdef linux then
               if _one_shot then
-                @printf[None]("resub\n".cstring())
+                //@printf[None]("resub\n".cstring())
                 @pony_asio_event_resubscribe_read(_event)
               end
             end
