@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define SCHED_BATCH 100
+#define SCHED_BATCH 10000
 
 static DECLARE_THREAD_FN(run_thread);
 
