@@ -385,14 +385,12 @@ actor TCPConnection
     else
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
-        if not _writeable then
           _writeable = true
           _complete_writes(arg)
           _pending_writes()
           ifdef linux then
             @pony_asio_event_resubscribe(event)
           end
-        end
       end
 
       if AsioEvent.readable(flags) then
@@ -400,9 +398,6 @@ actor TCPConnection
           _readable = true
           _complete_reads(arg)
           _pending_reads()
-          ifdef linux then
-            @pony_asio_event_resubscribe(event)
-          end
         end
       end
 
@@ -639,6 +634,9 @@ actor TCPConnection
           | 0 =>
             // Would block, try again later.
             _readable = false
+            ifdef linux then
+              @pony_asio_event_resubscribe(_event)
+            end
             return
           | _next_size =>
             // Increase the read buffer size.
