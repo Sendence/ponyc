@@ -13,6 +13,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #define MAX_SIGNAL 128
 
@@ -203,8 +204,10 @@ void pony_asio_event_subscribe(asio_event_t* ev)
   ep.data.ptr = ev;
   ep.events = EPOLLRDHUP | EPOLLET;
 
-  if(ev->flags & ASIO_ONESHOT)
+  if(ev->flags & ASIO_ONESHOT) {
+    printf("SETTING ONESHOT\n");
     ep.events |= EPOLLONESHOT;
+  }
 
   if(ev->flags & ASIO_READ)
     ep.events |= EPOLLIN;
