@@ -230,12 +230,12 @@ actor TCPConnection
     """
     A new connection accepted on a server.
     """
-    //_one_shot = true
+    _one_shot = true
     _listen = listen
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write(), 0, true)
+    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write_oneshot(), 0, true)
     _connected = true
     _writeable = true
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -311,7 +311,7 @@ actor TCPConnection
     @pony_os_peername[Bool](_fd, ip)
     ip
 
-/*
+
   fun ref expect(qty: USize = 0) =>
     """
     A `received` call on the notifier must contain exactly `qty` bytes. If
@@ -322,8 +322,8 @@ actor TCPConnection
       _expect = _notify.expect(this, qty)
       _read_buf_size()
     end
-*/
 
+/*
   fun ref expect(qty: USize = 0) =>
     """
     A `received` call on the notifier must contain exactly `qty` bytes. If
@@ -333,6 +333,7 @@ actor TCPConnection
     if not _in_sent then
       _expect = _notify.expect(this, qty)
     end
+*/
 
   fun ref set_nodelay(state: Bool) =>
     """
@@ -616,7 +617,7 @@ actor TCPConnection
       _queue_read()
     end
 
-
+/*
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
@@ -630,9 +631,9 @@ actor TCPConnection
     else
       _read_buf.undefined(_next_size)
     end
+*/
 
 
-/*
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
@@ -642,7 +643,7 @@ actor TCPConnection
     else
       _read_buf.undefined(_next_size)
     end
-*/
+
 
   fun ref _queue_read() =>
     """
@@ -660,6 +661,7 @@ actor TCPConnection
     end
 
 
+/*
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,
@@ -761,9 +763,9 @@ actor TCPConnection
         close()
       end
     end
+*/
 
 
-/*
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,
@@ -831,7 +833,7 @@ actor TCPConnection
         close()
       end
     end
-*/
+
 
   fun ref _notify_connecting() =>
     """
