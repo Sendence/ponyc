@@ -732,6 +732,15 @@ actor TCPConnection
                 _read_again()
                 return
               end
+
+              sum = sum + len
+
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                _read_buf_size()
+                _read_again()
+                return
+              end
             end
 
             _read_buf_size()
@@ -747,14 +756,14 @@ actor TCPConnection
             else
               _read_buf_size()
             end
-          end
 
-          sum = sum + len
+            sum = sum + len
 
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            _read_again()
-            return
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
+            end
           end
         end
       else
