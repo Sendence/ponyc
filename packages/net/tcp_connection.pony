@@ -6,7 +6,6 @@ use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe[None](event: AsioEventID)
-use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 type TCPConnectionAuth is (AmbientAuth | NetAuth | TCPAuth | TCPConnectAuth)
@@ -368,13 +367,6 @@ actor TCPConnection
           // We don't have a connection yet.
           if @pony_os_connected[Bool](fd) then
             // The connection was successful, make it ours.
-            if (_fd != fd) then
-              try
-                (let a, let b) = remote_address().name(None, true)
-                (let c, let d) = local_address().name(None, true)
-                @printf[None]("socket fds not equal, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
-              end
-            end
             _fd = fd
             _event = event
             _connected = true
@@ -388,12 +380,7 @@ actor TCPConnection
             _pending_writes()
             ifdef linux then
               if _one_shot then
-                @pony_asio_event_resubscribe(event)
-                try
-                  (let a, let b) = remote_address().name(None, true)
-                  (let c, let d) = local_address().name(None, true)
-                  @printf[None]("resubscribe, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
-                end
+                _resubscribe_event()
               end
             end
           else
@@ -429,7 +416,7 @@ actor TCPConnection
           _pending_writes()
           ifdef linux then
             if _one_shot then
-              @pony_asio_event_resubscribe_read(event)
+              _resubscribe_event()
               try
                 (let a, let b) = remote_address().name(None, true)
                 (let c, let d) = local_address().name(None, true)
@@ -706,7 +693,7 @@ actor TCPConnection
             _readable = false
             ifdef linux then
               if _one_shot then
-                @pony_asio_event_resubscribe_read(_event)
+                _resubscribe_event()
               end
             end
             return
@@ -803,7 +790,7 @@ actor TCPConnection
             _readable = false
             ifdef linux then
               if _one_shot then
-                @pony_asio_event_resubscribe_read(_event)
+                _resubscribe_event()
               end
             end
             return
@@ -949,3 +936,88 @@ actor TCPConnection
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
+
+  fun ref _resubscribe_event() =>
+    let flags = if not _readable and not _writeable then
+      read_write_oneshot()
+    else if not _readable then
+      read() or oneshot()
+    else if not _writeable then
+      write() or oneshort()
+    else
+      return
+    end
+
+    @pony_asio_event_resubscribe(_event, flags)
+
+
+/*
+  is read event active? if yes, no need to register
+    readable = true
+
+  is write event active? if yes, no need to register
+    writeable = true
+
+  on send:
+    are we not writeable?
+      add to pending
+
+
+    if we become throttled
+      call backpressure hook
+      writeable = false
+      trigger event change
+
+    if pending is cleared
+      call backpressure released hook
+
+  on send throttle:
+    writeable = false
+
+  on read:
+    did we block? if yes, we need to register a read event
+      readable = false
+      trigger event change
+
+    if no, we are read active
+      readable = true
+
+   on readable event arrival
+     shouldn't happen when we are _readable
+     _readable = true
+     trigger event change
+
+   on writeable event arrival
+     shouldn't happen when we are _writeable
+     _writable = true
+     trigger event change
+
+   on read:
+
+     if not muted and readable then read
+
+   on mute
+     _muted = true
+
+     trigger event change
+     do not register ASIO_READ
+
+
+   on unmute
+     _muted = false
+
+     trigger event change
+    register an ASIO_READ
+
+  ON EVENT CHANGE:
+
+    if _muted is false and _readable is false
+      ASIO_READ
+
+    if _writable is false
+      ASIO_WRITE
+
+
+
+*/
+
