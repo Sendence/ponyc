@@ -46,7 +46,6 @@ static bool exported_classes(compile_t* c, ast_t* program)
   if(c->opt->verbosity >= VERBOSITY_INFO)
     fprintf(stderr, " Export reachability\n");
 
-  bool found = false;
   ast_t* package = ast_child(program);
 
   while(package != NULL)
@@ -62,8 +61,6 @@ static bool exported_classes(compile_t* c, ast_t* program)
         if(ast_id(entity) == TK_EXPORT)
         {
           exported_methods(c, entity);
-
-          found = true;
         }
 
         entity = ast_sibling(entity);
