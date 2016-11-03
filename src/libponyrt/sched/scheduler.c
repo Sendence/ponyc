@@ -32,6 +32,25 @@ static bool use_yield;
 static mpmcq_t inject;
 static __pony_thread_local scheduler_t* this_scheduler;
 
+pony_ctx_t* scheduler_zero()
+{
+  return &scheduler[0].ctx;
+}
+
+pony_ctx_t* scheduler_not_zero(pony_ctx_t* ctx)
+{
+  if (true)
+    return &scheduler[0].ctx;
+
+  if(ctx->scheduler != &scheduler[0])
+    return ctx;
+
+  if(scheduler_count <= 1)
+    return scheduler_zero();
+
+  return &scheduler[1].ctx;
+}
+
 /**
  * Gets the next actor from the scheduler queue.
  */
@@ -45,7 +64,7 @@ static pony_actor_t* pop(scheduler_t* sched)
  */
 static void push(scheduler_t* sched, pony_actor_t* actor)
 {
-  ponyint_mpmcq_push_single(&sched->q, actor);
+  ponyint_mpmcq_push(&sched->q, actor);
 }
 
 /**
@@ -205,6 +224,7 @@ static scheduler_t* choose_victim(scheduler_t* sched)
     return victim;
   }
 
+  printf("STEAL NONE\n");
   return NULL;
 }
 

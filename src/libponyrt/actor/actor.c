@@ -18,9 +18,15 @@ enum
   FLAG_SYSTEM = 1 << 2,
   FLAG_UNSCHEDULED = 1 << 3,
   FLAG_PENDINGDESTROY = 1 << 4,
+  FLAG_NOISEY = 1 << 5,
 };
 
 static bool actor_noblock = false;
+
+void set_noisey(pony_actor_t* actor)
+{
+  actor->flags |= FLAG_NOISEY;
+}
 
 static bool has_flag(pony_actor_t* actor, uint8_t flag)
 {
@@ -331,7 +337,16 @@ void pony_sendv(pony_ctx_t* ctx, pony_actor_t* to, pony_msg_t* m)
   if(ponyint_messageq_push(&to->q, m))
   {
     if(!has_flag(to, FLAG_UNSCHEDULED))
-      ponyint_sched_add(ctx, to);
+    {
+      if (has_flag(to, FLAG_NOISEY))
+      {
+        ponyint_sched_add(scheduler_zero(), to);
+      }
+      else
+      {
+        ponyint_sched_add(scheduler_not_zero(ctx), to);
+      }
+    }
   }
 }
 
