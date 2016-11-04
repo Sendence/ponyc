@@ -189,9 +189,6 @@ class iso _TestArrays is UnitTest
 
 actor _EmptyActor
 
-class _HasPointer
-  var x: Pointer[U8] = Pointer[U8]
-
 class _HasActor
   var x: _EmptyActor = _EmptyActor
 
