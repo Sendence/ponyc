@@ -135,7 +135,7 @@ static void make_prototype(compile_t* c, reach_type_t* t,
 
   // Behaviours and actor constructors also have handler functions.
   bool handler = false;
-
+ 
   switch(ast_id(m->r_fun))
   {
     case TK_NEW:
@@ -196,6 +196,19 @@ static void make_prototype(compile_t* c, reach_type_t* t,
     // Store the finaliser and use the C calling convention and an external
     // linkage.
     t->final_fn = m->func;
+    LLVMSetFunctionCallConv(m->func, LLVMCCallConv);
+    LLVMSetLinkage(m->func, LLVMExternalLinkage);
+  } else if(n->name == c->str__serialise_space)
+  {
+    t->custom_serialise_space_fn = m->func;
+    LLVMSetFunctionCallConv(m->func, LLVMCCallConv);
+    LLVMSetLinkage(m->func, LLVMExternalLinkage);
+  } else if(n->name == c->str__serialise)
+  {
+    t->custom_serialise_fn = m->func;
+  } else if(n->name == c->str__deserialise)
+  {
+    t->custom_deserialise_fn = m->func;
     LLVMSetFunctionCallConv(m->func, LLVMCCallConv);
     LLVMSetLinkage(m->func, LLVMExternalLinkage);
   }

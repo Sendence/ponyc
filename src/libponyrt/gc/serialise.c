@@ -3,8 +3,10 @@
 #include "../lang/lang.h"
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 #define HIGH_BIT ((size_t)1 << ((sizeof(size_t) * 8) - 1))
+#define ALL_BITS ((size_t)(~0))
 
 PONY_EXTERN_C_BEGIN
 
@@ -27,6 +29,7 @@ struct serialise_t
   uintptr_t value;
   pony_type_t* t;
   int mutability;
+  bool block;
 };
 
 static size_t serialise_hash(serialise_t* p)
@@ -67,15 +70,6 @@ static void serialise_cleanup(pony_ctx_t* ctx)
 void ponyint_serialise_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
   int mutability)
 {
-  if(t->serialise == NULL)
-  {
-    // A type without a serialisation function raises an error.
-    // This applies to Pointer[A] and MaybePointer[A].
-    serialise_cleanup(ctx);
-    pony_throw();
-    return;
-  }
-
   serialise_t k;
   k.key = (uintptr_t)p;
   serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k);
@@ -92,9 +86,15 @@ void ponyint_serialise_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
     s->key = (uintptr_t)p;
     s->value = ctx->serialise_size;
     s->t = t;
+    s->block = false;
 
     ponyint_serialise_put(&ctx->serialise, s);
     ctx->serialise_size += t->size;
+
+    if(t->custom_serialise_space)
+    {
+      ctx->serialise_size += t->custom_serialise_space(p);
+    }
   }
 
   // Set (or update) mutability.
@@ -129,6 +129,7 @@ void pony_serialise_reserve(pony_ctx_t* ctx, void* p, size_t size)
   s->value = ctx->serialise_size;
   s->t = NULL;
   s->mutability = PONY_TRACE_OPAQUE;
+  s->block = true;
 
   ponyint_serialise_put(&ctx->serialise, s);
   ctx->serialise_size += size;
@@ -142,7 +143,12 @@ size_t pony_serialise_offset(pony_ctx_t* ctx, void* p)
 
   // If we are in the map, return the offset.
   if(s != NULL)
-    return s->value;
+  {
+    if(s->t != NULL || s->block)
+      return s->value;
+    else
+      return ALL_BITS;
+  }
 
   // If we are not in the map, we are an untraced primitive. Return the type id
   // with the high bit set.
@@ -171,7 +177,7 @@ void pony_serialise(pony_ctx_t* ctx, void* p, void* out)
 
   while((s = ponyint_serialise_next(&ctx->serialise, &i)) != NULL)
   {
-    if(s->t != NULL)
+    if(!(s->block) && s->t != NULL && s->t->serialise != NULL)
       s->t->serialise(ctx, (void*)s->key, r->ptr, s->value, s->mutability);
   }
 
@@ -181,6 +187,11 @@ void pony_serialise(pony_ctx_t* ctx, void* p, void* out)
 void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
   uintptr_t offset)
 {
+  // if all the bits of the offset are set, it is either a Pointer[A] a or a
+  // MaybePointer[A].
+  if(offset == ALL_BITS)
+    return NULL;
+
   // If the high bit of the offset is set, it is either an unserialised
   // primitive, or an unserialised field in an opaque object.
   if((offset & HIGH_BIT) != 0)
@@ -234,6 +245,12 @@ void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
   // Allocate the object, memcpy to it.
   void* object = pony_alloc(ctx, t->size);
   memcpy(object, (void*)((uintptr_t)ctx->serialise_buffer + offset), t->size);
+
+  if(t->custom_deserialise)
+  {
+    t->custom_deserialise(object,
+      (void*)((uintptr_t)ctx->serialise_buffer + offset + t->size));
+  }
 
   // Store a mapping of offset to object.
   s = POOL_ALLOC(serialise_t);
