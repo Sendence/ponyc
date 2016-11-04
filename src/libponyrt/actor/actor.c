@@ -191,6 +191,7 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
   // Tell the cycle detector we are blocking. We may not actually block if a
   // message is received between now and when we try to mark our queue as
   // empty, but that's ok, we have still logically blocked.
+  /*
   if(!has_flag(actor, FLAG_BLOCKED | FLAG_SYSTEM) ||
     has_flag(actor, FLAG_RC_CHANGED))
   {
@@ -198,6 +199,7 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
     unset_flag(actor, FLAG_RC_CHANGED);
     ponyint_cycle_block(ctx, actor, &actor->gc);
   }
+  */
 
   // Return true (i.e. reschedule immediately) if our queue isn't empty.
   return !ponyint_messageq_markempty(&actor->q);
@@ -339,13 +341,9 @@ void pony_sendv(pony_ctx_t* ctx, pony_actor_t* to, pony_msg_t* m)
     if(!has_flag(to, FLAG_UNSCHEDULED))
     {
       if (has_flag(to, FLAG_NOISEY))
-      {
-        ponyint_sched_add(scheduler_zero(), to);
-      }
-      else
-      {
         ponyint_sched_add(scheduler_not_zero(ctx), to);
-      }
+      else
+        ponyint_sched_add(ctx, to);
     }
   }
 }

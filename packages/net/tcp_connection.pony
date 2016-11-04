@@ -379,15 +379,19 @@ actor TCPConnection
     else
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
-        _writeable = true
-        _complete_writes(arg)
-        _pending_writes()
+        if not _writeable then
+          _writeable = true
+          _complete_writes(arg)
+          _pending_writes()
+        end
       end
 
       if AsioEvent.readable(flags) then
-        _readable = true
-        _complete_reads(arg)
-        _pending_reads()
+        if not _readable then
+          _readable = true
+          _complete_reads(arg)
+          _pending_reads()
+        end
       end
 
       if AsioEvent.disposable(flags) then

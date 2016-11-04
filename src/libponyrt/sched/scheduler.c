@@ -39,9 +39,6 @@ pony_ctx_t* scheduler_zero()
 
 pony_ctx_t* scheduler_not_zero(pony_ctx_t* ctx)
 {
-  if (true)
-    return &scheduler[0].ctx;
-
   if(ctx->scheduler != &scheduler[0])
     return ctx;
 
@@ -198,7 +195,6 @@ static scheduler_t* choose_victim(scheduler_t* sched)
   while(true)
   {
     // Schedulers are laid out sequentially in memory
-
     // Back up one.
     victim--;
 
@@ -215,7 +211,6 @@ static scheduler_t* choose_victim(scheduler_t* sched)
       break;
     }
 
-    // Don't try to steal from ourself.
     if(victim == sched)
       continue;
 
@@ -224,7 +219,6 @@ static scheduler_t* choose_victim(scheduler_t* sched)
     return victim;
   }
 
-  printf("STEAL NONE\n");
   return NULL;
 }
 
