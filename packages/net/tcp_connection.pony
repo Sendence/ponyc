@@ -235,7 +235,8 @@ actor TCPConnection
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write(), 0, true)
+    _one_shot = true
+    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write_oneshot(), 0, true)
     _connected = true
     _writeable = true
     _read_buf = recover Array[U8].undefined(init_size) end
