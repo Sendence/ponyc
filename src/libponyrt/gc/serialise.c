@@ -260,12 +260,6 @@ void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
 
   memcpy(object, (void*)((uintptr_t)ctx->serialise_buffer + offset), t->size);
 
-  if(t->custom_deserialise)
-  {
-    t->custom_deserialise(object,
-      (void*)((uintptr_t)ctx->serialise_buffer + offset + t->size));
-  }
-
   // Store a mapping of offset to object.
   s = POOL_ALLOC(serialise_t);
   s->key = offset;
