@@ -407,7 +407,7 @@ actor TCPConnection
     """
     Resume reading.
     """
-    _reads = reads - 1
+    _reads = _reads - 1
     _pending_reads()
 
   fun ref write_final(data: ByteSeq) =>
