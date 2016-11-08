@@ -878,7 +878,7 @@ actor TCPConnection
     _notify.unthrottled(this)
 
   fun ref _resubscribe_event() =>
-    let flags = if not _readable and not _writeable then
+    /*let flags = if not _readable and not _writeable then
       AsioEvent.read_write_oneshot()
     elseif not _readable then
       AsioEvent.read() or AsioEvent.oneshot()
@@ -886,9 +886,11 @@ actor TCPConnection
       AsioEvent.write() or AsioEvent.oneshot()
     else
       return
-    end
+    end*/
 
-    @pony_asio_event_resubscribe(_event, flags)
+
+    @pony_asio_event_resubscribe(_event, AsioEvent.read_write_oneshot()
+)
 
 
 /*
