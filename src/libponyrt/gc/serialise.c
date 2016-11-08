@@ -144,7 +144,7 @@ size_t pony_serialise_offset(pony_ctx_t* ctx, void* p)
   // If we are in the map, return the offset.
   if(s != NULL)
   {
-    if(s->t != NULL || s->block)
+    if(s->block || (s->t != NULL && s->t->serialise != NULL))
       return s->value;
     else
       return ALL_BITS;
@@ -246,19 +246,15 @@ void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
   void* object = pony_alloc(ctx, t->size);
   memcpy(object, (void*)((uintptr_t)ctx->serialise_buffer + offset), t->size);
 
-  if(t->custom_deserialise)
-  {
-    t->custom_deserialise(object,
-      (void*)((uintptr_t)ctx->serialise_buffer + offset + t->size));
-  }
-
   // Store a mapping of offset to object.
   s = POOL_ALLOC(serialise_t);
   s->key = offset;
   s->value = (uintptr_t)object;
+  s->t = t;
   ponyint_serialise_put(&ctx->serialise, s);
 
   recurse(ctx, object, t->deserialise);
+
   return object;
 }
 
@@ -276,6 +272,21 @@ void* pony_deserialise_block(pony_ctx_t* ctx, uintptr_t offset, size_t size)
   return block;
 }
 
+void custom_deserialise(pony_ctx_t* ctx)
+{
+  size_t i = HASHMAP_BEGIN;
+  serialise_t* s;
+
+  while((s = ponyint_serialise_next(&ctx->serialise, &i)) != NULL)
+  {
+    if (s->t != NULL && s->t->custom_deserialise != NULL)
+    {
+      s->t->custom_deserialise((void *)(s->value),
+        (void*)((uintptr_t)ctx->serialise_buffer + s->key + s->t->size));
+    }
+  }
+}
+
 void* pony_deserialise(pony_ctx_t* ctx, void* in)
 {
   // This can raise an error.
@@ -285,6 +296,8 @@ void* pony_deserialise(pony_ctx_t* ctx, void* in)
 
   void* object = pony_deserialise_offset(ctx, NULL, 0);
   ponyint_gc_handlestack(ctx);
+
+  custom_deserialise(ctx);
 
   serialise_cleanup(ctx);
   return object;

@@ -288,9 +288,9 @@ static bool verify_deserialiser(pass_opt_t* opt, ast_t* ast)
     ok = false;
   }
 
-  if(ast_id(cap) != TK_BOX)
+  if(ast_id(cap) != TK_REF)
   {
-    ast_error(opt->check.errors, cap, "_deserialise must be box");
+    ast_error(opt->check.errors, cap, "_deserialise must be ref");
     ok = false;
   }
 
