@@ -5,7 +5,7 @@ use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
-use @pony_asio_event_resubscribe[None](event: AsioEventID)
+use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 type TCPConnectionAuth is (AmbientAuth | NetAuth | TCPAuth | TCPConnectAuth)
@@ -878,11 +878,11 @@ actor TCPConnection
 
   fun ref _resubscribe_event() =>
     let flags = if not _readable and not _writeable then
-      read_write_oneshot()
-    else if not _readable then
-      read() or oneshot()
-    else if not _writeable then
-      write() or oneshort()
+      AsioEvent.read_write_oneshot()
+    elseif not _readable then
+      AsioEvent.read() or AsioEvent.oneshot()
+    elseif not _writeable then
+      AsioEvent.write() or AsioEvent.oneshot()
     else
       return
     end
