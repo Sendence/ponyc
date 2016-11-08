@@ -642,7 +642,7 @@ actor TCPConnection
 
         while _readable and not _shutdown_peer do
           if _muted then
-            if _reads > 0 then
+            if not _reads > 0 then
               for i in Range(0,2) do
                 _read_again()
                 _reads = _reads + 1
@@ -651,7 +651,7 @@ actor TCPConnection
             return
           end
 
-          if _expect_read_buf.size() > 1 then
+          if _expect_read_buf.size() > 0 then
             while _expect_read_buf.size() >= _expect do
               let block_size = if _expect != 0 then
                 _expect
@@ -661,7 +661,7 @@ actor TCPConnection
 
               let out = _expect_read_buf.block(block_size)
               if not _notify.received(this, consume out) then
-                if _reads > 0 then
+                if not _reads > 0 then
                   for i in Range(0,2) do
                     _read_again()
                     _reads = _reads + 1
@@ -707,7 +707,7 @@ actor TCPConnection
 
               if not _notify.received(this, consume out) then
                 _read_buf_size()
-                if _reads > 0 then
+                if not _reads > 0 then
                   for i in Range(0,2) do
                     _read_again()
                     _reads = _reads + 1
@@ -721,7 +721,7 @@ actor TCPConnection
               if sum >= _max_size then
                 // If we've read _max_size, yield and read again later.
                 _read_buf_size()
-                if _reads > 0 then
+                if not _reads > 0 then
                   for i in Range(0,2) do
                     _read_again()
                     _reads = _reads + 1
@@ -739,7 +739,7 @@ actor TCPConnection
 
             if not _notify.received(this, consume data) then
               _read_buf_size()
-              if _reads > 0 then
+              if not _reads > 0 then
                 for i in Range(0,2) do
                   _read_again()
                   _reads = _reads + 1
@@ -754,7 +754,7 @@ actor TCPConnection
 
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
-              if _reads > 0 then
+              if not _reads > 0 then
                 for i in Range(0,2) do
                   _read_again()
                   _reads = _reads + 1
