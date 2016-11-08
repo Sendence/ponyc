@@ -164,6 +164,7 @@ actor TCPConnection
 
   var _read_buf: Array[U8] iso
   var _expect_read_buf: Reader = Reader
+  var _reads: U32 = 0
 
   var _next_size: USize
   let _max_size: USize
@@ -427,18 +428,11 @@ actor TCPConnection
       end
 
       if AsioEvent.readable(flags) then
-        //if not _readable then
-          //@printf[None]("readable\n".cstring())
+        if not _readable then
           _readable = true
           _complete_reads(arg)
           _pending_reads()
-        /*else
-          try
-            (let a, let b) = remote_address().name(None, true)
-            (let c, let d) = local_address().name(None, true)
-            @printf[None]("readable, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
-          end
-        end*/
+        end
       end
 
       if AsioEvent.disposable(flags) then
@@ -453,6 +447,7 @@ actor TCPConnection
     """
     Resume reading.
     """
+    _reads = _reads - 1
     _pending_reads()
 
   fun ref write_final(data: ByteSeq) =>
@@ -604,7 +599,6 @@ actor TCPConnection
       _queue_read()
     end
 
-/*
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
@@ -618,19 +612,6 @@ actor TCPConnection
     else
       _read_buf.undefined(_next_size)
     end
-*/
-
-
-  fun ref _read_buf_size() =>
-    """
-    Resize the read buffer.
-    """
-    if _expect != 0 then
-      _read_buf.undefined(_expect)
-    else
-      _read_buf.undefined(_next_size)
-    end
-
 
   fun ref _queue_read() =>
     """
@@ -648,7 +629,6 @@ actor TCPConnection
     end
 
 
-/*
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,
@@ -661,7 +641,12 @@ actor TCPConnection
 
         while _readable and not _shutdown_peer do
           if _muted then
-            _read_again()
+            if _reads > 0 then
+              for i in Range(0,2) do
+                _read_again()
+                _reads = _reads + 1
+              end
+            end
             return
           end
 
@@ -675,7 +660,12 @@ actor TCPConnection
 
               let out = _expect_read_buf.block(block_size)
               if not _notify.received(this, consume out) then
-                _read_again()
+                if _reads > 0 then
+                  for i in Range(0,2) do
+                    _read_again()
+                    _reads = _reads + 1
+                  end
+                end
                 return
               end
             end
@@ -716,7 +706,12 @@ actor TCPConnection
 
               if not _notify.received(this, consume out) then
                 _read_buf_size()
-                _read_again()
+                if _reads > 0 then
+                  for i in Range(0,2) do
+                    _read_again()
+                    _reads = _reads + 1
+                  end
+                end
                 return
               end
 
@@ -725,7 +720,12 @@ actor TCPConnection
               if sum >= _max_size then
                 // If we've read _max_size, yield and read again later.
                 _read_buf_size()
-                _read_again()
+                if _reads > 0 then
+                  for i in Range(0,2) do
+                    _read_again()
+                    _reads = _reads + 1
+                  end
+                end
                 return
               end
             end
@@ -738,7 +738,12 @@ actor TCPConnection
 
             if not _notify.received(this, consume data) then
               _read_buf_size()
-              _read_again()
+              if _reads > 0 then
+                for i in Range(0,2) do
+                  _read_again()
+                  _reads = _reads + 1
+                end
+              end
               return
             else
               _read_buf_size()
@@ -748,79 +753,14 @@ actor TCPConnection
 
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
-            end
-          end
-        end
-      else
-        // The socket has been closed from the other side.
-        _shutdown_peer = true
-        close()
-      end
-    end
-*/
-
-
-  fun ref _pending_reads() =>
-    """
-    Unless this connection is currently muted, read while data is available,
-    guessing the next packet length as we go. If we read 4 kb of data, send
-    ourself a resume message and stop reading, to avoid starving other actors.
-    """
-    ifdef not windows then
-      try
-        var sum: USize = 0
-
-        while _readable and not _shutdown_peer do
-          if _muted then
-            _read_again()
-            return
-          end
-
-          // Read as much data as possible.
-          let len = @pony_os_recv[USize](
-            _event,
-            _read_buf.cpointer().usize() + _read_len,
-            _read_buf.size() - _read_len) ?
-
-          match len
-          | 0 =>
-            // Would block, try again later.
-            _readable = false
-            ifdef linux then
-              if _one_shot then
-                _resubscribe_event()
+              if _reads > 0 then
+                for i in Range(0,2) do
+                  _read_again()
+                  _reads = _reads + 1
+                end
               end
-            end
-            return
-          | _next_size =>
-            // Increase the read buffer size.
-            _next_size = _max_size.min(_next_size * 2)
-          end
-
-          _read_len = _read_len + len
-
-          if _read_len >= _expect then
-            let data = _read_buf = recover Array[U8] end
-            data.truncate(_read_len)
-            _read_len = 0
-
-            if not _notify.received(this, consume data) then
-              _read_buf_size()
-              _read_again()
               return
-            else
-              _read_buf_size()
             end
-          end
-
-          sum = sum + len
-
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            _read_again()
-            return
           end
         end
       else
@@ -829,7 +769,6 @@ actor TCPConnection
         close()
       end
     end
-
 
   fun ref _notify_connecting() =>
     """
