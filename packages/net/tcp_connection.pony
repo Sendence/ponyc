@@ -419,11 +419,11 @@ actor TCPConnection
           ifdef linux then
             if _one_shot then
               _resubscribe_event()
-              try
+              /*try
                 (let a, let b) = remote_address().name(None, true)
                 (let c, let d) = local_address().name(None, true)
                 @printf[None]("resubscribe read, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
-              end
+              end*/
             end
           end
       end
