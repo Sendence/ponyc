@@ -230,13 +230,12 @@ actor TCPConnection
     """
     A new connection accepted on a server.
     """
-    //_one_shot = true
     _listen = listen
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    _one_shot = true
-    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write_oneshot(), 0, true)
+    _one_shot = false
+    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write(), 0, true)
     _connected = true
     _writeable = true
     _read_buf = recover Array[U8].undefined(init_size) end
