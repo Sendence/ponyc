@@ -650,37 +650,37 @@ actor TCPConnection
             return
           end
 
-          if _expect_read_buf.size() > 0 then
-            while _expect_read_buf.size() >= _expect do
-              let block_size = if _expect != 0 then
-                _expect
-              else
-                _expect_read_buf.size()
-              end
+          while (_expect_read_buf.size() > 0) and
+            (_expect_read_buf.size() >= _expect)
+          do
+            let block_size = if _expect != 0 then
+              _expect
+            else
+              _expect_read_buf.size()
+            end
 
-              let out = _expect_read_buf.block(block_size)
-              if not _notify.received(this, consume out) then
-                if not _reads > 0 then
-                  for i in Range(0,2) do
-                    _read_again()
-                    _reads = _reads + 1
-                  end
+            let out = _expect_read_buf.block(block_size)
+            if not _notify.received(this, consume out) then
+              if not _reads > 0 then
+                for i in Range(0,2) do
+                  _read_again()
+                  _reads = _reads + 1
                 end
-                return
               end
+              return
+            end
 
-              sum = sum + block_size
+            sum = sum + block_size
 
-              if sum >= _max_size then
-                // If we've read _max_size, yield and read again later.
-                if not _reads > 0 then
-                  for i in Range(0,2) do
-                    _read_again()
-                    _reads = _reads + 1
-                  end
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              if not _reads > 0 then
+                for i in Range(0,2) do
+                  _read_again()
+                  _reads = _reads + 1
                 end
-                return
               end
+              return
             end
           end
 
@@ -715,7 +715,9 @@ actor TCPConnection
 
             _expect_read_buf.append(consume data)
 
-            while _expect_read_buf.size() >= _expect do
+            while (_expect_read_buf.size() > 0) and
+              (_expect_read_buf.size() >= _expect)
+            do
               let out = _expect_read_buf.block(_expect)
               let osize = _expect
 
