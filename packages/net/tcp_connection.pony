@@ -668,9 +668,23 @@ actor TCPConnection
                 end
                 return
               end
+
+              sum = sum + block_size
+
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                if not _reads > 0 then
+                  for i in Range(0,2) do
+                    _read_again()
+                    _reads = _reads + 1
+                  end
+                end
+                return
+              end
             end
           end
 
+          _read_buf_size()
           // Read as much data as possible.
           let len = @pony_os_recv[USize](
             _event,
@@ -703,9 +717,9 @@ actor TCPConnection
 
             while _expect_read_buf.size() >= _expect do
               let out = _expect_read_buf.block(_expect)
+              let osize = _expect
 
               if not _notify.received(this, consume out) then
-                _read_buf_size()
                 if not _reads > 0 then
                   for i in Range(0,2) do
                     _read_again()
@@ -715,11 +729,10 @@ actor TCPConnection
                 return
               end
 
-              sum = sum + len
+              sum = sum + osize
 
               if sum >= _max_size then
                 // If we've read _max_size, yield and read again later.
-                _read_buf_size()
                 if not _reads > 0 then
                   for i in Range(0,2) do
                     _read_again()
@@ -729,15 +742,13 @@ actor TCPConnection
                 return
               end
             end
-
-            _read_buf_size()
           else
             let data = _read_buf = recover Array[U8] end
             data.truncate(_read_len)
+            let dsize = _read_len
             _read_len = 0
 
             if not _notify.received(this, consume data) then
-              _read_buf_size()
               if not _reads > 0 then
                 for i in Range(0,2) do
                   _read_again()
@@ -745,11 +756,9 @@ actor TCPConnection
                 end
               end
               return
-            else
-              _read_buf_size()
             end
 
-            sum = sum + len
+            sum = sum + dsize
 
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
