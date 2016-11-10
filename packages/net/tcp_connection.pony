@@ -551,6 +551,11 @@ actor TCPConnection
             // Send remaining data later.
             node() = (data, offset + len)
             _writeable = false
+            ifdef linux then
+              if _one_shot then
+                _resubscribe_event()
+              end
+            end
             //@printf[None]("writeable is false\n".cstring())
           else
             // This chunk has been fully sent.
@@ -880,6 +885,11 @@ actor TCPConnection
   fun ref _apply_backpressure() =>
     ifdef not windows then
       _writeable = false
+      ifdef linux then
+        if _one_shot then
+          _resubscribe_event()
+        end
+      end
     end
 
     _notify.throttled(this)
