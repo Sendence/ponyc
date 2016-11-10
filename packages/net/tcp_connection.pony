@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -161,6 +162,9 @@ actor TCPConnection
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   var _read_buf: Array[U8] iso
 
+  var _expect_read_buf: Reader = Reader
+  var _reads: U32 = 0
+
   var _next_size: USize
   let _max_size: USize
 
@@ -311,7 +315,6 @@ actor TCPConnection
     """
     if not _in_sent then
       _expect = _notify.expect(this, qty)
-      _read_buf_size()
     end
 
   fun ref set_nodelay(state: Bool) =>
@@ -402,6 +405,7 @@ actor TCPConnection
     """
     Resume reading.
     """
+     _reads = _reads - 1
     _pending_reads()
 
   fun ref write_final(data: ByteSeq) =>
@@ -556,8 +560,12 @@ actor TCPConnection
     """
     Resize the read buffer.
     """
-    if _expect != 0 then
-      _read_buf.undefined(_expect)
+    ifdef windows then
+      if _expect != 0 then
+        _read_buf.undefined(_expect)
+      else
+        _read_buf.undefined(_next_size)
+      end
     else
       _read_buf.undefined(_next_size)
     end
@@ -589,10 +597,50 @@ actor TCPConnection
 
         while _readable and not _shutdown_peer do
           if _muted then
-            _read_again()
+            if _reads == 0 then
+              for i in Range(0,2) do
+                _read_again()
+                _reads = _reads + 1
+              end
+            end
             return
           end
 
+          while (_expect_read_buf.size() > 0) and
+            (_expect_read_buf.size() >= _expect)
+          do
+            let block_size = if _expect != 0 then
+              _expect
+            else
+              _expect_read_buf.size()
+            end
+
+            let out = _expect_read_buf.block(block_size)
+            if not _notify.received(this, consume out) then
+              if _reads == 0 then
+                for i in Range(0,2) do
+                  _read_again()
+                  _reads = _reads + 1
+                end
+              end
+              return
+            end
+
+            sum = sum + block_size
+
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              if _reads == 0 then
+                for i in Range(0,2) do
+                  _read_again()
+                  _reads = _reads + 1
+                end
+              end
+              return
+            end
+          end
+
+          _read_buf_size()
           // Read as much data as possible.
           let len = @pony_os_recv[USize](
             _event,
@@ -611,26 +659,70 @@ actor TCPConnection
 
           _read_len = _read_len + len
 
-          if _read_len >= _expect then
+          if _expect != 0 then
             let data = _read_buf = recover Array[U8] end
             data.truncate(_read_len)
             _read_len = 0
 
-            if not _notify.received(this, consume data) then
-              _read_buf_size()
-              _read_again()
-              return
-            else
-              _read_buf_size()
+            _expect_read_buf.append(consume data)
+
+            while (_expect_read_buf.size() > 0) and
+              (_expect_read_buf.size() >= _expect)
+            do
+              let out = _expect_read_buf.block(_expect)
+              let osize = _expect
+
+              if not _notify.received(this, consume out) then
+                if _reads == 0 then
+                  for i in Range(0,2) do
+                    _read_again()
+                    _reads = _reads + 1
+                  end
+                end
+                return
+              end
+
+              sum = sum + osize
+
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                if _reads == 0 then
+                  for i in Range(0,2) do
+                    _read_again()
+                    _reads = _reads + 1
+                  end
+                end
+                return
+              end
             end
-          end
+          else
+            let data = _read_buf = recover Array[U8] end
+            data.truncate(_read_len)
+            let dsize = _read_len
+            _read_len = 0
 
-          sum = sum + len
+            if not _notify.received(this, consume data) then
+              if _reads == 0 then
+                for i in Range(0,2) do
+                  _read_again()
+                  _reads = _reads + 1
+                end
+              end
+              return
+            end
 
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            _read_again()
-            return
+            sum = sum + dsize
+
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              if _reads == 0 then
+                for i in Range(0,2) do
+                  _read_again()
+                  _reads = _reads + 1
+                end
+              end
+              return
+            end
           end
         end
       else
