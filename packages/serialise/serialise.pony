@@ -83,6 +83,13 @@ class val Serialised
     @pony_serialise2[None](@pony_ctx[Pointer[None]](), data, r) ?
     _data = consume r
 
+  new create3(auth: SerialiseAuth, data: Any box) ? =>
+    """
+    A caller with SerialiseAuth can create serialised data from any object.
+    """
+    @pony_serialise2[None](@pony_ctx[Pointer[None]](), data) ?
+    _data = recover Array[U8] end
+
   new input(auth: InputSerialisedAuth, data: Array[U8] val) =>
     """
     A caller with InputSerialisedAuth can create serialised data from any

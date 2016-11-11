@@ -208,6 +208,20 @@ void pony_serialise2(pony_ctx_t* ctx, void* p, void* out)
   serialise_cleanup(ctx);
 }
 
+void pony_serialise3(pony_ctx_t* ctx, void* p)
+{
+  // This can raise an error.
+  assert(ctx->stack == NULL);
+  ctx->trace_object = ponyint_serialise_object;
+  ctx->trace_actor = ponyint_serialise_actor;
+  ctx->serialise_size = 0;
+
+  pony_traceunknown(ctx, p, PONY_TRACE_MUTABLE);
+  ponyint_gc_handlestack(ctx);
+
+  serialise_cleanup(ctx);
+}
+
 void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
   uintptr_t offset)
 {
