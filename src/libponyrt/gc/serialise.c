@@ -161,6 +161,34 @@ void pony_serialise(pony_ctx_t* ctx, void* p, void* out)
   pony_traceunknown(ctx, p, PONY_TRACE_MUTABLE);
   ponyint_gc_handlestack(ctx);
 
+  ponyint_array_t* r = (ponyint_array_t*)out;
+  r->size = ctx->serialise_size;
+  r->alloc = r->size;
+  r->ptr = (char*)ponyint_pool_alloc_size(r->size);
+
+  size_t i = HASHMAP_BEGIN;
+  serialise_t* s;
+
+  while((s = ponyint_serialise_next(&ctx->serialise, &i)) != NULL)
+  {
+    if(s->t != NULL)
+      s->t->serialise(ctx, (void*)s->key, r->ptr, s->value, s->mutability);
+  }
+
+  serialise_cleanup(ctx);
+}
+
+void pony_serialise2(pony_ctx_t* ctx, void* p, void* out)
+{
+  // This can raise an error.
+  assert(ctx->stack == NULL);
+  ctx->trace_object = ponyint_serialise_object;
+  ctx->trace_actor = ponyint_serialise_actor;
+  ctx->serialise_size = 0;
+
+  pony_traceunknown(ctx, p, PONY_TRACE_MUTABLE);
+  ponyint_gc_handlestack(ctx);
+
   if (1 == 0) {
   ponyint_array_t* r = (ponyint_array_t*)out;
   r->size = ctx->serialise_size;
