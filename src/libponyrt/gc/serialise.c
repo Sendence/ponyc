@@ -161,7 +161,7 @@ void pony_serialise(pony_ctx_t* ctx, void* p, void* out)
   pony_traceunknown(ctx, p, PONY_TRACE_MUTABLE);
   ponyint_gc_handlestack(ctx);
 
-/*
+  if (1 == 0) {
   ponyint_array_t* r = (ponyint_array_t*)out;
   r->size = ctx->serialise_size;
   r->alloc = r->size;
@@ -175,7 +175,7 @@ void pony_serialise(pony_ctx_t* ctx, void* p, void* out)
     if(s->t != NULL)
       s->t->serialise(ctx, (void*)s->key, r->ptr, s->value, s->mutability);
   }
-*/
+  }
 
   serialise_cleanup(ctx);
 }
