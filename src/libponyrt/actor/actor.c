@@ -103,7 +103,7 @@ static bool handle_message(pony_ctx_t* ctx, pony_actor_t* actor,
 
 static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
 {
-  if (actor->handled < 500)
+  if (actor->handled < 100)
     return;
   else
     actor->handled = 0;
