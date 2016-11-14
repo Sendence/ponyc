@@ -18,9 +18,15 @@ enum
   FLAG_SYSTEM = 1 << 2,
   FLAG_UNSCHEDULED = 1 << 3,
   FLAG_PENDINGDESTROY = 1 << 4,
+  FLAG_NOISEY = 1 << 5,
 };
 
 static bool actor_noblock = false;
+
+void set_noisey(pony_actor_t* actor)
+{
+  actor->flags |= FLAG_NOISEY;
+}
 
 static bool has_flag(pony_actor_t* actor, uint8_t flag)
 {
@@ -103,12 +109,15 @@ static bool handle_message(pony_ctx_t* ctx, pony_actor_t* actor,
 
 static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
 {
-  if (actor->handled < 100)
-    return;
-  else
-    actor->handled = 0;
+//  if (has_flag(actor, FLAG_NOISEY))
+//  {
+//    if (actor->handled < 1000)
+//      return;
+//    else
+//      actor->handled = 0;
+//  }
 
-  if(!ponyint_heap_startgc(&actor->heap))
+  if(!ponyint_heap_startgc(&actor->heap, has_flag(actor, FLAG_NOISEY)))
     return;
 
   DTRACE1(GC_START, (uintptr_t)ctx->scheduler);

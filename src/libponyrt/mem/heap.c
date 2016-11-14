@@ -344,10 +344,18 @@ void ponyint_heap_used(heap_t* heap, size_t size)
   heap->used += size;
 }
 
-bool ponyint_heap_startgc(heap_t* heap)
+bool ponyint_heap_startgc(heap_t* heap, bool noisey)
 {
-  if(heap->used <= heap->next_gc)
-    return false;
+  if(noisey)
+  {
+    if(heap->used <= heap->next_gc)
+      return false;
+  }
+  else
+  {
+    if(heap->used <= (heap->next_gc/10))
+      return false;
+  }
 
   for(int i = 0; i < HEAP_SIZECLASSES; i++)
   {
