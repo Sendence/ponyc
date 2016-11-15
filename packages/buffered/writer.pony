@@ -58,16 +58,6 @@ class Writer
   var _offset: USize = 0
   var _size: USize = 0
 
-  fun ref reserve_chunks(size': USize): Writer^ =>
-    """
-    Reserve space for size' chunks.
-
-    This needs to be recalled after every call to `done`
-    as `done` resets the chunks.
-    """
-    _chunks.reserve(size')
-    this
-
   fun ref reserve(size': USize): Writer^ =>
     """
     Reserve space for size additional bytes.
@@ -101,7 +91,7 @@ class Writer
     Write a Bool to the buffer.
     """
     u8(data.u8())
-    
+
   fun ref u16_le(data: U16): Writer^ =>
     """
     Write a U16 to the buffer in little-endian byte order.

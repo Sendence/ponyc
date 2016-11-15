@@ -103,6 +103,11 @@ static bool handle_message(pony_ctx_t* ctx, pony_actor_t* actor,
 
 static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
 {
+  if (actor->handled < 500)
+    return;
+  else
+    actor->handled = 0;
+
   if(!ponyint_heap_startgc(&actor->heap))
     return;
 
@@ -154,10 +159,13 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
     {
       // If we handle an application message, try to gc.
       app++;
-      try_gc(ctx, actor);
+      //try_gc(ctx, actor);
 
-      if(app == batch)
+      if(app == batch) {
+        actor->handled += app;
+        try_gc(ctx, actor);
         return !has_flag(actor, FLAG_UNSCHEDULED);
+      }
     }
 
     // Stop handling a batch if we reach the head we found when we were
@@ -169,6 +177,7 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
   // We didn't hit our app message batch limit. We now believe our queue to be
   // empty, but we may have received further messages.
   assert(app < batch);
+  actor->handled += app;
   try_gc(ctx, actor);
 
   if(has_flag(actor, FLAG_UNSCHEDULED))
