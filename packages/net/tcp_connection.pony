@@ -164,7 +164,6 @@ actor TCPConnection
 
   var _read_buf: Array[U8] iso
   var _expect_read_buf: Reader = Reader
-  var _reads: U32 = 0
 
   var _next_size: USize
   let _max_size: USize
@@ -447,7 +446,6 @@ actor TCPConnection
     """
     Resume reading.
     """
-    _reads = _reads - 1
     _pending_reads()
 
   fun ref write_final(data: ByteSeq) =>
@@ -646,12 +644,7 @@ actor TCPConnection
 
         while _readable and not _shutdown_peer do
           if _muted then
-            if not _reads > 0 then
-              for i in Range(0,2) do
-                _read_again()
-                _reads = _reads + 1
-              end
-            end
+            _read_again()
             return
           end
 
@@ -666,12 +659,7 @@ actor TCPConnection
 
             let out = _expect_read_buf.block(block_size)
             if not _notify.received(this, consume out) then
-              if not _reads > 0 then
-                for i in Range(0,2) do
-                  _read_again()
-                  _reads = _reads + 1
-                end
-              end
+              _read_again()
               return
             end
 
@@ -679,12 +667,7 @@ actor TCPConnection
 
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
-              if not _reads > 0 then
-                for i in Range(0,2) do
-                  _read_again()
-                  _reads = _reads + 1
-                end
-              end
+              _read_again()
               return
             end
           end
@@ -727,12 +710,7 @@ actor TCPConnection
               let osize = _expect
 
               if not _notify.received(this, consume out) then
-                if not _reads > 0 then
-                  for i in Range(0,2) do
-                    _read_again()
-                    _reads = _reads + 1
-                  end
-                end
+                _read_again()
                 return
               end
 
@@ -740,12 +718,7 @@ actor TCPConnection
 
               if sum >= _max_size then
                 // If we've read _max_size, yield and read again later.
-                if not _reads > 0 then
-                  for i in Range(0,2) do
-                    _read_again()
-                    _reads = _reads + 1
-                  end
-                end
+                _read_again()
                 return
               end
             end
@@ -756,12 +729,7 @@ actor TCPConnection
             _read_len = 0
 
             if not _notify.received(this, consume data) then
-              if not _reads > 0 then
-                for i in Range(0,2) do
-                  _read_again()
-                  _reads = _reads + 1
-                end
-              end
+              _read_again()
               return
             end
 
@@ -769,12 +737,7 @@ actor TCPConnection
 
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
-              if not _reads > 0 then
-                for i in Range(0,2) do
-                  _read_again()
-                  _reads = _reads + 1
-                end
-              end
+              _read_again()
               return
             end
           end
