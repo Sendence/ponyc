@@ -117,7 +117,7 @@ static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
 //      actor->handled = 0;
 //  }
 
-  if(!ponyint_heap_startgc(&actor->heap, has_flag(actor, FLAG_NOISEY)))
+  if(!ponyint_heap_startgc(&actor->heap))
     return;
 
   DTRACE1(GC_START, (uintptr_t)ctx->scheduler);
@@ -139,25 +139,7 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
   pony_msg_t* msg;
   size_t app = 0;
-
-  while(actor->continuation != NULL)
-  {
-    msg = actor->continuation;
-    actor->continuation = atomic_load_explicit(&msg->next,
-       memory_order_relaxed);
-    bool ret = handle_message(ctx, actor, msg);
-    ponyint_pool_free(msg->index, msg);
-
-    if(ret)
-    {
-      // If we handle an application message, try to gc.
-      app++;
-      try_gc(ctx, actor);
-
-      if(app == batch)
-        return !has_flag(actor, FLAG_UNSCHEDULED);
-    }
-  }
+  size_t not_app = 0;
 
   // If we have been scheduled, the head will not be marked as empty.
   pony_msg_t* head = atomic_load_explicit(&actor->q.head, memory_order_relaxed);
@@ -168,29 +150,33 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
     {
       // If we handle an application message, try to gc.
       app++;
-      try_gc(ctx, actor);
+      //try_gc(ctx, actor);
 
-      if(app == batch)
+      if(app == batch) {
+        try_gc(ctx, actor);
+        if (has_flag(actor, FLAG_NOISEY))
+          printf("Batch. app %ld not app %ld\n", app, not_app);
+
         return !has_flag(actor, FLAG_UNSCHEDULED);
+      }
     }
-
+    else
+    {
+      not_app++;
+    }
     // Stop handling a batch if we reach the head we found when we were
     // scheduled.
     if(msg == head)
       break;
   }
 
+  if (has_flag(actor, FLAG_NOISEY))
+    printf("Batch. app %ld not app %ld\n", app, not_app);
+
   // We didn't hit our app message batch limit. We now believe our queue to be
   // empty, but we may have received further messages.
   assert(app < batch);
   try_gc(ctx, actor);
-
-  if(has_flag(actor, FLAG_UNSCHEDULED))
-  {
-    // When unscheduling, don't mark the queue as empty, since we don't want
-    // to get rescheduled if we receive a message.
-    return false;
-  }
 
   // If we have processed any application level messages, defer blocking.
   if(app > 0)
@@ -199,13 +185,6 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
   // Tell the cycle detector we are blocking. We may not actually block if a
   // message is received between now and when we try to mark our queue as
   // empty, but that's ok, we have still logically blocked.
-  if(!has_flag(actor, FLAG_BLOCKED | FLAG_SYSTEM) ||
-    has_flag(actor, FLAG_RC_CHANGED))
-  {
-    set_flag(actor, FLAG_BLOCKED);
-    unset_flag(actor, FLAG_RC_CHANGED);
-    ponyint_cycle_block(ctx, actor, &actor->gc);
-  }
 
   // Return true (i.e. reschedule immediately) if our queue isn't empty.
   return !ponyint_messageq_markempty(&actor->q);

@@ -59,7 +59,7 @@ void* ponyint_heap_realloc(pony_actor_t* actor, heap_t* heap, void* p,
  */
 void ponyint_heap_used(heap_t* heap, size_t size);
 
-bool ponyint_heap_startgc(heap_t* heap, bool noisey);
+bool ponyint_heap_startgc(heap_t* heap);
 
 /**
  * Mark an address in a chunk. Returns true if it was already marked, or false
