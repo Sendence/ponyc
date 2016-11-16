@@ -460,8 +460,19 @@ void ponyint_heap_free(chunk_t* chunk, void* p)
   }
 }
 
-void ponyint_heap_endgc(heap_t* heap)
+void ponyint_heap_endgc(heap_t* heap, bool noisey)
 {
+  if(noisey)
+  {
+    if(heap->used <= heap->next_gc)
+      return false;
+  }
+  else
+  {
+    if(heap->used <= (heap->next_gc/10))
+      return false;
+  }
+
   size_t used = 0;
 
   for(int i = 0; i < HEAP_SIZECLASSES; i++)

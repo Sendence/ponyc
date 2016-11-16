@@ -83,7 +83,7 @@ bool ponyint_heap_ismarked(chunk_t* chunk, void* p);
  */
 void ponyint_heap_free(chunk_t* chunk, void* p);
 
-void ponyint_heap_endgc(heap_t* heap);
+void ponyint_heap_endgc(heap_t* heap, bool noisey);
 
 pony_actor_t* ponyint_heap_owner(chunk_t* chunk);
 

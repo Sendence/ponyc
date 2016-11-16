@@ -109,15 +109,22 @@ static bool handle_message(pony_ctx_t* ctx, pony_actor_t* actor,
 
 static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
 {
-//  if (has_flag(actor, FLAG_NOISEY))
-//  {
-//    if (actor->handled < 1000)
-//      return;
-//    else
-//      actor->handled = 0;
-//  }
+  if (has_flag(actor, FLAG_NOISEY))
+  {
+    if (actor->handled < 100)
+      return;
+    else
+      actor->handled = 0;
+  }
+  else
+  {
+    if (actor->handled < 10)
+      return;
+    else
+      actor->handled = 0;
+  }
 
-  if(!ponyint_heap_startgc(&actor->heap, has_flag(actor, FLAG_NOISEY)))
+  if(!ponyint_heap_startgc(&actor->heap), has_flag(actor, FLAG_NOISEY)
     return;
 
   DTRACE1(GC_START, (uintptr_t)ctx->scheduler);
@@ -128,7 +135,7 @@ static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
     actor->type->trace(ctx, actor);
 
   ponyint_mark_done(ctx);
-  ponyint_heap_endgc(&actor->heap);
+  ponyint_heap_endgc(&actor->heap, has_flag(actor, FLAG_NOISEY);
 
   DTRACE1(GC_END, (uintptr_t)ctx->scheduler);
 }
