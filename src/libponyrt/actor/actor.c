@@ -145,8 +145,8 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
   while((msg = ponyint_messageq_pop(&actor->q)) != NULL)
   {
-    handle_message(ctx, actor, msg)
-    msgs++
+    handle_message(ctx, actor, msg);
+    msgs++;
 
     if(msgs == batch || msg == head)
       break;
