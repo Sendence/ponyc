@@ -233,8 +233,13 @@ actor TCPConnection
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    _one_shot = true
-    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write_oneshot(), 0, true)
+    ifdef linux then
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write_oneshot(), 0, true)
+    else
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write(), 0, true)
+    end
     _connected = true
     _writeable = true
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -281,6 +286,7 @@ actor TCPConnection
     Start reading off this TCPConnection again after having been muted.
     """
     _muted = false
+    _pending_reads()
 
   be set_notify(notify: TCPConnectionNotify iso) =>
     """
@@ -378,11 +384,6 @@ actor TCPConnection
             // Don't call _complete_writes, as Windows will see this as a
             // closed connection.
             _pending_writes()
-            ifdef linux then
-              if _one_shot then
-                _resubscribe_event()
-              end
-            end
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -404,34 +405,15 @@ actor TCPConnection
     else
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
-        /*
-          try
-                  (let a, let b) = remote_address().name(None, true)
-                  (let c, let d) = local_address().name(None, true)
-                  @printf[None]("writeable event: %s %s\n".cstring(), b.cstring(), d.cstring())
-          end
-          */
-          _writeable = true
-          _complete_writes(arg)
-          _pending_writes()
-          ifdef linux then
-            if _one_shot then
-              _resubscribe_event()
-              /*try
-                (let a, let b) = remote_address().name(None, true)
-                (let c, let d) = local_address().name(None, true)
-                @printf[None]("resubscribe read, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
-              end*/
-            end
-          end
+        _writeable = true
+        _complete_writes(arg)
+        _pending_writes()
       end
 
       if AsioEvent.readable(flags) then
-        //if not _readable then
-          _readable = true
-          _complete_reads(arg)
-          _pending_reads()
-        //end
+        _readable = true
+        _complete_reads(arg)
+        _pending_reads()
       end
 
       if AsioEvent.disposable(flags) then
@@ -441,6 +423,7 @@ actor TCPConnection
 
       _try_shutdown()
     end
+    _resubscribe_event()
 
   be _read_again() =>
     """
@@ -549,12 +532,6 @@ actor TCPConnection
             // Send remaining data later.
             node() = (data, offset + len)
             _writeable = false
-            ifdef linux then
-              if _one_shot then
-                _resubscribe_event()
-              end
-            end
-            //@printf[None]("writeable is false\n".cstring())
           else
             // This chunk has been fully sent.
             _pending.shift()
@@ -644,7 +621,6 @@ actor TCPConnection
 
         while _readable and not _shutdown_peer do
           if _muted then
-            _read_again()
             return
           end
 
@@ -658,22 +634,25 @@ actor TCPConnection
             end
 
             let out = _expect_read_buf.block(block_size)
-            if not _notify.received(this, consume out) then
-              _read_again()
-              return
-            end
+            let carry_on = _notify.received(this, consume out)
+            ifdef osx then
+              if not carry_on then
+                _read_again()
+                return
+              end
 
-            sum = sum + block_size
+              sum = sum + block_size
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                _read_again()
+                return
+              end
             end
           end
 
-          _read_buf_size()
           // Read as much data as possible.
+          _read_buf_size()
           let len = @pony_os_recv[USize](
             _event,
             _read_buf.cpointer().usize() + _read_len,
@@ -683,11 +662,7 @@ actor TCPConnection
           | 0 =>
             // Would block, try again later.
             _readable = false
-            ifdef linux then
-              if _one_shot then
-                _resubscribe_event()
-              end
-            end
+            _resubscribe_event()
             return
           | _next_size =>
             // Increase the read buffer size.
@@ -709,17 +684,20 @@ actor TCPConnection
               let out = _expect_read_buf.block(_expect)
               let osize = _expect
 
-              if not _notify.received(this, consume out) then
-                _read_again()
-                return
-              end
+              let carry_on = _notify.received(this, consume out)
+              ifdef osx then
+                if not carry_on then
+                  _read_again()
+                  return
+                end
 
-              sum = sum + osize
+                sum = sum + osize
 
-              if sum >= _max_size then
-                // If we've read _max_size, yield and read again later.
-                _read_again()
-                return
+                if sum >= _max_size then
+                  // If we've read _max_size, yield and read again later.
+                  _read_again()
+                  return
+                end
               end
             end
           else
@@ -728,17 +706,20 @@ actor TCPConnection
             let dsize = _read_len
             _read_len = 0
 
-            if not _notify.received(this, consume data) then
-              _read_again()
-              return
-            end
+            let carry_on = _notify.received(this, consume data)
+            ifdef osx then
+              if not carry_on then
+                _read_again()
+                return
+              end
 
-            sum = sum + dsize
+              sum = sum + dsize
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                _read_again()
+                return
+              end
             end
           end
         end
@@ -861,87 +842,17 @@ actor TCPConnection
     _notify.unthrottled(this)
 
   fun ref _resubscribe_event() =>
-    let flags = if not _readable and not _writeable then
-      AsioEvent.read_write_oneshot()
-    elseif not _readable then
-      AsioEvent.read() or AsioEvent.oneshot()
-    elseif not _writeable then
-      AsioEvent.write() or AsioEvent.oneshot()
-    else
-      return
+    ifdef linux then
+      let flags = if not _readable and not _writeable then
+        AsioEvent.read_write_oneshot()
+      elseif not _readable then
+        AsioEvent.read() or AsioEvent.oneshot()
+      elseif not _writeable then
+        AsioEvent.write() or AsioEvent.oneshot()
+      else
+        return
+      end
+
+      @pony_asio_event_resubscribe(_event, flags)
     end
-
-
-    @pony_asio_event_resubscribe(_event, flags)
-
-
-/*
-  is read event active? if yes, no need to register
-    readable = true
-
-  is write event active? if yes, no need to register
-    writeable = true
-
-  on send:
-    are we not writeable?
-      add to pending
-
-
-    if we become throttled
-      call backpressure hook
-      writeable = false
-      trigger event change
-
-    if pending is cleared
-      call backpressure released hook
-
-  on send throttle:
-    writeable = false
-
-  on read:
-    did we block? if yes, we need to register a read event
-      readable = false
-      trigger event change
-
-    if no, we are read active
-      readable = true
-
-   on readable event arrival
-     shouldn't happen when we are _readable
-     _readable = true
-     trigger event change
-
-   on writeable event arrival
-     shouldn't happen when we are _writeable
-     _writable = true
-     trigger event change
-
-   on read:
-
-     if not muted and readable then read
-
-   on mute
-     _muted = true
-
-     trigger event change
-     do not register ASIO_READ
-
-
-   on unmute
-     _muted = false
-
-     trigger event change
-    register an ASIO_READ
-
-  ON EVENT CHANGE:
-
-    if _muted is false and _readable is false
-      ASIO_READ
-
-    if _writable is false
-      ASIO_WRITE
-
-
-
-*/
 

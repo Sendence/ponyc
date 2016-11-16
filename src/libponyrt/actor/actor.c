@@ -139,13 +139,16 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
   pony_msg_t* msg;
   size_t msgs = 0;
+  size_t apps = 0;
 
   // If we have been scheduled, the head will not be marked as empty.
   pony_msg_t* head = atomic_load_explicit(&actor->q.head, memory_order_relaxed);
 
   while((msg = ponyint_messageq_pop(&actor->q)) != NULL)
   {
-    handle_message(ctx, actor, msg);
+    if(handle_message(ctx, actor, msg))
+      apps++;
+
     msgs++;
 
     if(msgs == batch || msg == head)
@@ -162,7 +165,7 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
   assert(msgs < batch);
 
   // If we have processed any application level messages, defer blocking.
-  if(msgs > 0)
+  if(apps > 0)
     return true;
 
   // Tell the cycle detector we are blocking. We may not actually block if a
