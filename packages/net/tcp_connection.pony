@@ -257,6 +257,16 @@ actor TCPConnection
       _in_sent = false
     end
 
+  be queue(data: ByteSeq) =>
+    """
+    Queue a single sequence of bytes on linux.
+    Do nothing on windows.
+    """
+    ifdef not windows then
+      _pending_writev.push(data.cpointer().usize()).push(data.size())
+      _pending_writev_total = _pending_writev_total + data.size()
+    end
+
   be writev(data: ByteSeqIter) =>
     """
     Write a sequence of sequences of bytes.
@@ -279,6 +289,28 @@ actor TCPConnection
       end
 
       _in_sent = false
+    end
+
+  be queuev(data: ByteSeqIter) =>
+    """
+    Queue a sequence of sequences of bytes on linux.
+    Do nothing on windows.
+    """
+
+    ifdef not windows then
+      for bytes in _notify.sentv(this, data).values() do
+        _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+        _pending_writev_total = _pending_writev_total + bytes.size()
+      end
+    end
+
+  be send_queue() =>
+    """
+    Write pending queue to network on linux.
+    Do nothing on windows.
+    """
+    ifdef not windows then
+      _pending_writes()
     end
 
   be mute() =>
