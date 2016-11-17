@@ -5,7 +5,7 @@
 #include <mem/pagemap.h>
 
 #include <gtest/gtest.h>
-
+/*
 TEST(Heap, Init)
 {
   pony_actor_t* actor = (pony_actor_t*)0xDEADBEEFDEADBEEF;
@@ -66,3 +66,4 @@ TEST(Heap, Init)
 
   ponyint_heap_destroy(&heap);
 }
+*/
