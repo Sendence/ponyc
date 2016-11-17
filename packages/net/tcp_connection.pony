@@ -162,7 +162,7 @@ actor TCPConnection
   var _shutdown_peer: Bool = false
   var _in_sent: Bool = false
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
-  var _pending_writev: Array[USize] = _pending_writev.create()
+  embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
 
   var _read_buf: Array[U8] iso
@@ -430,9 +430,6 @@ actor TCPConnection
                 //sent all data; release backpressure
                 _release_backpressure()
               end
-              if _one_shot then
-                _resubscribe_event()
-              end
             end
           else
             // The connection failed, unsubscribe the event and close.
@@ -461,14 +458,6 @@ actor TCPConnection
             if _pending_writes() then
               //sent all data; release backpressure
               _release_backpressure()
-            end
-            if _one_shot then
-              _resubscribe_event()
-              /*try
-                (let a, let b) = remote_address().name(None, true)
-                (let c, let d) = local_address().name(None, true)
-                @printf[None]("resubscribe read, got event: %s %s\n".cstring(), b.cstring(), d.cstring())
-              end*/
             end
           end
       end
@@ -603,11 +592,11 @@ actor TCPConnection
                 _pending_writev.update(1, iov_s-len)
                 _pending_writev_total = _pending_writev_total - len
                 _apply_backpressure()
-
-                //didn't send all data
-                return false
               end
             end
+
+            //didn't send all data
+            return false
           else
             // sent all data we requested in this batch
             _pending_writev.remove(0, num_to_send*2)
