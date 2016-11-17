@@ -16,6 +16,8 @@ typedef void* (*map_fn)(void* a, void* arg);
 
 typedef void* (*alloc_fn)(size_t size);
 
+typedef void* (*oalloc_fn)(void* p, uint32_t s);
+
 typedef void (*free_fn)(void* data);
 
 typedef void (*free_size_fn)(size_t size, void* data);

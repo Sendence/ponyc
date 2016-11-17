@@ -29,13 +29,18 @@ static object_t* object_alloc(void* address, uint32_t mark)
   return obj;
 }
 
+static void* obj_alloc(void* address, uint32_t mark)
+{
+  return (void*)object_alloc(address, mark);
+}
+
 static void object_free(object_t* obj)
 {
   POOL_FREE(object_t, obj);
 }
 
-DEFINE_HASHMAP(ponyint_objectmap, objectmap_t, object_t, object_hash,
-  object_cmp, ponyint_pool_alloc_size, ponyint_pool_free_size, object_free);
+DEFINE_HASHMAPALT(ponyint_objectmap, objectmap_t, object_t, object_hash,
+  object_cmp, ponyint_pool_alloc_size, ponyint_pool_free_size, object_free, obj_alloc);
 
 object_t* ponyint_objectmap_getobject(objectmap_t* map, void* address)
 {
@@ -48,14 +53,10 @@ object_t* ponyint_objectmap_getobject(objectmap_t* map, void* address)
 object_t* ponyint_objectmap_getorput(objectmap_t* map, void* address,
   uint32_t mark)
 {
-  object_t* obj = ponyint_objectmap_getobject(map, address);
+  object_t obj;
+  obj.address = address;
 
-  if(obj != NULL)
-    return obj;
-
-  obj = object_alloc(address, mark);
-  ponyint_objectmap_put(map, obj);
-  return obj;
+  return ponyint_objectmap_get_or_put(map, &obj, address, mark);
 }
 
 object_t* ponyint_objectmap_register_final(objectmap_t* map, void* address,
@@ -68,7 +69,7 @@ object_t* ponyint_objectmap_register_final(objectmap_t* map, void* address,
 
 void ponyint_objectmap_final(objectmap_t* map)
 {
-  size_t i = HASHMAP_BEGIN;
+  size_t i = HASHMAPALT_BEGIN;
   object_t* obj;
 
   while((obj = ponyint_objectmap_next(map, &i)) != NULL)
@@ -81,7 +82,7 @@ void ponyint_objectmap_final(objectmap_t* map)
 size_t ponyint_objectmap_sweep(objectmap_t* map)
 {
   size_t count = 0;
-  size_t i = HASHMAP_BEGIN;
+  size_t i = HASHMAPALT_BEGIN;
   object_t* obj;
 
   while((obj = ponyint_objectmap_next(map, &i)) != NULL)

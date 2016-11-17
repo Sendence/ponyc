@@ -1,7 +1,7 @@
 #ifndef gc_objectmap_h
 #define gc_objectmap_h
 
-#include "../ds/hash.h"
+#include "../ds/hash_alt.h"
 #include <platform.h>
 
 PONY_EXTERN_C_BEGIN
@@ -15,7 +15,7 @@ typedef struct object_t
   bool immutable;
 } object_t;
 
-DECLARE_HASHMAP(ponyint_objectmap, objectmap_t, object_t);
+DECLARE_HASHMAPALT(ponyint_objectmap, objectmap_t, object_t);
 
 object_t* ponyint_objectmap_getobject(objectmap_t* map, void* address);
 
