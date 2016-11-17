@@ -20,6 +20,7 @@
 #include <mstcpip.h>
 #include <mswsock.h>
 #else
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -877,6 +878,33 @@ bool pony_os_host_ip6(const char* host)
   struct in6_addr addr;
   return inet_pton(AF_INET6, host, &addr) == 1;
 }
+
+#ifndef PLATFORM_IS_WINDOWS
+size_t pony_os_writev(asio_event_t* ev, const struct iovec *iov, int iovcnt)
+{
+  const struct iovec *t = iov;
+  for(int i = 0; i < iovcnt; i++)
+  {
+    printf("writev iov pointer: %p; %lu, size: %lu\n", t->iov_base, (ssize_t)(t->iov_base), t->iov_len);
+    t++;
+  }
+
+  printf("writev iov count: %d\n", iovcnt);
+  ssize_t sent = writev(ev->fd, iov, iovcnt);
+
+  if(sent < 0)
+  {
+    if(errno == EWOULDBLOCK)
+      return 0;
+
+    printf("writev error: %d\n", errno);
+    pony_throw();
+  }
+
+  printf("writev sent: %ld\n", sent);
+  return (size_t)sent;
+}
+#endif
 
 size_t pony_os_send(asio_event_t* ev, const char* buf, size_t len)
 {
