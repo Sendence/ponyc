@@ -10,13 +10,6 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 
 type TCPConnectionAuth is (AmbientAuth | NetAuth | TCPAuth | TCPConnectAuth)
 
-struct _IOV
-  let p: Pointer[U8] tag
-  let s: USize
-  new create(p': Pointer[U8] tag, s': USize) =>
-    p = p'
-    s = s'
-
 actor TCPConnection
   """
   A TCP connection. When connecting, the Happy Eyeballs algorithm is used.
@@ -168,7 +161,7 @@ actor TCPConnection
   var _shutdown_peer: Bool = false
   var _in_sent: Bool = false
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
-  var _pending_writev: Array[_IOV] = _pending_writev.create()
+  var _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
 
   var _read_buf: Array[U8] iso
@@ -264,7 +257,7 @@ actor TCPConnection
         write_final(_notify.sent(this, data))
       else
         let bytes = _notify.sent(this, data)
-        _pending_writev.push(_IOV(bytes.cpointer(), bytes.size()))
+        _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
         _pending_writev_total = _pending_writev_total + bytes.size()
         _pending_writes()
       end
@@ -286,7 +279,7 @@ actor TCPConnection
         end
       else
         for bytes in _notify.sentv(this, data).values() do
-          _pending_writev.push(_IOV(bytes.cpointer(), bytes.size()))
+          _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
           _pending_writev_total = _pending_writev_total + bytes.size()
         end
 
@@ -565,25 +558,22 @@ actor TCPConnection
     ifdef not windows then
       while _writeable and (_pending_writev.size() > 0) do
         try
-          for d in _pending_writev.values() do
-            @printf[None]("pony writev pointer: %p; %s, size: %s\n".cstring(), d.p, d.p.usize().string().cstring(), d.s.string().cstring())
-          end
-          @printf[None]("pony writev to_send: %s\n".cstring(), _pending_writev_total.string().cstring())
           // Write as much data as possible.
           var len = @pony_os_writev[USize](_event,
-            _pending_writev.cpointer(), _pending_writev.size()) ?
+            _pending_writev.cpointer(), (_pending_writev.size()/2).min(@pony_os_writev_max[I32]().usize())) ?
 
-          @printf[None]("pony writev to_send: %s, sent: %s\n".cstring(), _pending_writev_total.string().cstring(), len.string().cstring())
           if len < _pending_writev_total then
             while len > 0 do
-              let iov = _pending_writev(0)
-              if iov.s <= len then
-                len = len - iov.s
+              let iov_p = _pending_writev(0)
+              let iov_s = _pending_writev(1)
+              if iov_s <= len then
+                len = len - iov_s
                 _pending_writev.shift()
-                _pending_writev_total = _pending_writev_total - iov.s
+                _pending_writev.shift()
+                _pending_writev_total = _pending_writev_total - iov_s
               else
-                //TODO: figure out better way for pointer offsets
-                _pending_writev.update(0, _IOV(iov.p.unsafe().offset(len), iov.s-len))
+                _pending_writev.update(0, iov_p+len)
+                _pending_writev.update(1, iov_s-len)
                 _pending_writev_total = _pending_writev_total - len
               end
             end
