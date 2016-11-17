@@ -28,12 +28,6 @@ struct Pointer[A]
     """
     compile_intrinsic
 
-  fun tag unsafe(): Pointer[A] ref =>
-    """
-    Unsafe change in reference capability.
-    """
-    _unsafe()
-
   fun _apply(i: USize): this->A =>
     """
     Retrieve index i.
@@ -51,12 +45,6 @@ struct Pointer[A]
     Return a pointer to the n-th element.
     """
     compile_intrinsic
-
-  fun offset(n: USize): this->Pointer[A] =>
-    """
-    Return a pointer to the n-th element.
-    """
-    _offset(n)
 
   fun tag _element_size(): USize =>
     """
