@@ -880,16 +880,13 @@ bool pony_os_host_ip6(const char* host)
 }
 
 #ifndef PLATFORM_IS_WINDOWS
+int pony_os_writev_max()
+{
+  return IOV_MAX;
+}
+
 size_t pony_os_writev(asio_event_t* ev, const struct iovec *iov, int iovcnt)
 {
-  const struct iovec *t = iov;
-  for(int i = 0; i < iovcnt; i++)
-  {
-    printf("writev iov pointer: %p; %lu, size: %lu\n", t->iov_base, (ssize_t)(t->iov_base), t->iov_len);
-    t++;
-  }
-
-  printf("writev iov count: %d\n", iovcnt);
   ssize_t sent = writev(ev->fd, iov, iovcnt);
 
   if(sent < 0)
@@ -897,11 +894,10 @@ size_t pony_os_writev(asio_event_t* ev, const struct iovec *iov, int iovcnt)
     if(errno == EWOULDBLOCK)
       return 0;
 
-    printf("writev error: %d\n", errno);
+    printf("writev error: %d, iovcnt: %d\n", errno, iovcnt);
     pony_throw();
   }
 
-  printf("writev sent: %ld\n", sent);
   return (size_t)sent;
 }
 #endif
