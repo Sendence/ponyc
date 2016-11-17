@@ -172,7 +172,6 @@ actor TCPConnection
   var _expect: USize = 0
 
   var _muted: Bool = false
-  var _one_shot: Bool = true
 
   new create(auth: TCPConnectionAuth, notify: TCPConnectionNotify iso,
     host: String, service: String, from: String = "", init_size: USize = 64,
@@ -325,7 +324,6 @@ actor TCPConnection
     """
     if not _in_sent then
       _expect = _notify.expect(this, qty)
-      _read_buf_size()
     end
 
 /*
@@ -830,9 +828,7 @@ actor TCPConnection
     ifdef not windows then
       _writeable = false
       ifdef linux then
-        if _one_shot then
-          _resubscribe_event()
-        end
+        _resubscribe_event()
       end
     end
 
