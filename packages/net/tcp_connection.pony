@@ -558,7 +558,7 @@ actor TCPConnection
     ifdef not windows then
       var num_to_send: USize = 0
       var bytes_to_send: USize = 0
-      while _writeable and (_pending_writev.size() > 0) do
+      while _writeable and (_pending_writev_total > 0) do
         try
           //determine number of bytes and buffers to send
           if (_pending_writev.size()/2) < @pony_os_writev_max[I32]().usize() then
@@ -594,25 +594,24 @@ actor TCPConnection
                 _apply_backpressure()
               end
             end
-
-            //didn't send all data
-            return false
           else
             // sent all data we requested in this batch
-            _pending_writev.remove(0, num_to_send*2)
             _pending_writev_total = _pending_writev_total - bytes_to_send
+            if _pending_writev_total == 0 then
+              _pending_writev.clear()
+              return true
+            else
+              _pending_writev.remove(0, num_to_send*2)
+            end
           end
         else
           // Non-graceful shutdown on error.
           _hard_close()
-
-          //didn't send all data
-          return false
         end
       end
     end
-    //sent all data
-    true
+
+    false
 
   fun ref _complete_reads(len: U32) =>
     """
