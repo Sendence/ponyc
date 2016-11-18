@@ -595,9 +595,9 @@ actor TCPConnection
                 _pending_writev.update(0, iov_p+len)
                 _pending_writev.update(1, iov_s-len)
                 _pending_writev_total = _pending_writev_total - len
-                _apply_backpressure()
               end
             end
+            _apply_backpressure()
           else
             // sent all data we requested in this batch
             _pending_writev_total = _pending_writev_total - bytes_to_send
