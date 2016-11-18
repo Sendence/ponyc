@@ -161,6 +161,8 @@ actor TCPConnection
   var _shutdown: Bool = false
   var _shutdown_peer: Bool = false
   var _in_sent: Bool = false
+
+  //TODO: figure out how to ifdef this
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -839,10 +841,16 @@ actor TCPConnection
       return
     end
 
+    let rem = ifdef windows then
+      _pending.size()
+    else
+      _pending_writev_total
+    end
+
     if
       not _shutdown and
       (_connect_count == 0) and
-      (_pending.size() == 0)
+      (rem == 0)
     then
       _shutdown = true
 
@@ -881,7 +889,8 @@ actor TCPConnection
     ifdef not windows then
       // Unsubscribe immediately and drop all pending writes.
       @pony_asio_event_unsubscribe(_event)
-      _pending.clear()
+      _pending_writev.clear()
+      _pending_writev_total = 0
       _readable = false
       _writeable = false
     end
