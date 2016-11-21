@@ -13,6 +13,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #define MAX_SIGNAL 128
 
@@ -125,6 +126,7 @@ DECLARE_THREAD_FN(ponyint_asio_backend_dispatch)
       uint32_t flags = 0;
       uint32_t count = 0;
 
+
       if(ev->flags & ASIO_READ)
       {
         if(ep->events & (EPOLLIN | EPOLLRDHUP | EPOLLHUP | EPOLLERR))
@@ -232,6 +234,10 @@ void pony_asio_event_subscribe(asio_event_t* ev)
     }
   }
 
+  if(ev->flags & ASIO_ONESHOT) {
+    ep.events |= EPOLLONESHOT;
+  }
+
   epoll_ctl(b->epfd, EPOLL_CTL_ADD, ev->fd, &ep);
 }
 
@@ -294,4 +300,28 @@ void pony_asio_event_unsubscribe(asio_event_t* ev)
   send_request(ev, ASIO_DISPOSABLE);
 }
 
+void pony_asio_event_resubscribe(asio_event_t* ev, uint32_t flags)
+{
+  if((ev == NULL) ||
+    (ev->flags == ASIO_DISPOSABLE) ||
+    (ev->flags == ASIO_DESTROYED))
+    return;
+
+  asio_backend_t* b = ponyint_asio_get_backend();
+
+  struct epoll_event ep;
+  ep.data.ptr = ev;
+  ep.events = EPOLLRDHUP | EPOLLET;
+
+  if(flags & ASIO_ONESHOT)
+    ep.events |= EPOLLONESHOT;
+
+  if(flags & ASIO_READ)
+    ep.events |= EPOLLIN;
+
+  if(flags & ASIO_WRITE)
+    ep.events |= EPOLLOUT;
+
+  epoll_ctl(b->epfd, EPOLL_CTL_MOD, ev->fd, &ep);
+}
 #endif

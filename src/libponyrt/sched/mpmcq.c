@@ -71,7 +71,7 @@ void* ponyint_mpmcq_pop(mpmcq_t* q)
   // Get the next node rather than the tail. The tail is either a stub or has
   // already been consumed.
   mpmcq_node_t* next = atomic_load_explicit(&tail->next, memory_order_relaxed);
-  
+
   // Bailout if we have no next node.
   if(next == NULL)
   {
@@ -84,7 +84,7 @@ void* ponyint_mpmcq_pop(mpmcq_t* q)
 
   // Synchronise-with the push.
   atomic_thread_fence(memory_order_acquire);
-  
+
   // We'll return the data pointer from the next node.
   void* data = atomic_load_explicit(&next->data, memory_order_relaxed);
 
@@ -102,4 +102,17 @@ void* ponyint_mpmcq_pop(mpmcq_t* q)
   // Free the old tail. The new tail is the next node.
   POOL_FREE(mpmcq_node_t, tail);
   return data;
+}
+
+void* ponyint_mpmcq_pop_bailout_immediate(mpmcq_t* q)
+{
+  mpmcq_node_t* head = atomic_load_explicit(&q->head, memory_order_relaxed);
+  mpmcq_node_t* tail = atomic_load_explicit(&q->tail, memory_order_relaxed);
+
+  // If we believe the queue is empty, bailout immediately without taking a
+  // ticket to avoid unnecessary contention.
+  if(head == tail)
+    return NULL;
+
+  return ponyint_mpmcq_pop(q);
 }
