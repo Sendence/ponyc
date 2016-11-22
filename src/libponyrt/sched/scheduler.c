@@ -365,7 +365,7 @@ pony_ctx_t* ponyint_sched_init(uint32_t threads, bool noyield, bool nopin,
   uint32_t asio_cpu = ponyint_cpu_assign(scheduler_count, scheduler, nopin,
     pinasio);
 
-  float gc_fudge_factor = 1.0;
+  double gc_fudge_factor = 1.0;
 
   for(uint32_t i = 0; i < scheduler_count; i++)
   {
