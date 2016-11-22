@@ -33,7 +33,7 @@ void ponyint_heap_setinitialgc(size_t size);
 
 void ponyint_heap_setnextgcfactor(double factor);
 
-void ponyint_heap_init(heap_t* heap);
+void ponyint_heap_init(heap_t* heap, pony_ctx_t * ctx);
 
 void ponyint_heap_destroy(heap_t* heap);
 
@@ -83,7 +83,7 @@ bool ponyint_heap_ismarked(chunk_t* chunk, void* p);
  */
 void ponyint_heap_free(chunk_t* chunk, void* p);
 
-void ponyint_heap_endgc(heap_t* heap);
+void ponyint_heap_endgc(heap_t* heap, pony_ctx_t * ctx);
 
 pony_actor_t* ponyint_heap_owner(chunk_t* chunk);
 

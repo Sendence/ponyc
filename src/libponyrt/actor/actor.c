@@ -120,7 +120,7 @@ static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
     actor->type->trace(ctx, actor);
 
   ponyint_mark_done(ctx);
-  ponyint_heap_endgc(&actor->heap);
+  ponyint_heap_endgc(&actor->heap, ctx);
 
   DTRACE1(GC_END, (uintptr_t)ctx->scheduler);
 }
@@ -254,7 +254,7 @@ pony_actor_t* pony_create(pony_ctx_t* ctx, pony_type_t* type)
   actor->type = type;
 
   ponyint_messageq_init(&actor->q);
-  ponyint_heap_init(&actor->heap);
+  ponyint_heap_init(&actor->heap, ctx);
   ponyint_gc_done(&actor->gc);
 
   if(actor_noblock)

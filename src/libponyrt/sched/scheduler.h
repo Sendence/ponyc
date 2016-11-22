@@ -30,6 +30,8 @@ typedef struct pony_ctx_t
   void* serialise_buffer;
   size_t serialise_size;
   ponyint_serialise_t serialise;
+
+  float gc_fudge_factor;
 } pony_ctx_t;
 
 struct scheduler_t

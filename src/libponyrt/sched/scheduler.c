@@ -365,12 +365,18 @@ pony_ctx_t* ponyint_sched_init(uint32_t threads, bool noyield, bool nopin,
   uint32_t asio_cpu = ponyint_cpu_assign(scheduler_count, scheduler, nopin,
     pinasio);
 
+  float gc_fudge_factor = 1.0;
+
   for(uint32_t i = 0; i < scheduler_count; i++)
   {
     scheduler[i].ctx.scheduler = &scheduler[i];
+    scheduler[i].ctx.gc_fudge_factor = gc_fudge_factor;
     scheduler[i].last_victim = &scheduler[i];
     ponyint_messageq_init(&scheduler[i].mq);
     ponyint_mpmcq_init(&scheduler[i].q);
+    gc_fudge_factor += 1.0;
+    if (gc_fudge_factor >= 2.0)
+      gc_fudge_factor = 1.0;
   }
 
   this_scheduler = &scheduler[0];

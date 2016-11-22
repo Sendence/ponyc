@@ -1,6 +1,7 @@
 #include "heap.h"
 #include "pagemap.h"
 #include "../ds/fun.h"
+#include "../sched/scheduler.h"
 #include <string.h>
 #include <assert.h>
 
@@ -183,10 +184,13 @@ void ponyint_heap_setnextgcfactor(double factor)
   heap_nextgc_factor = factor;
 }
 
-void ponyint_heap_init(heap_t* heap)
+void ponyint_heap_init(heap_t* heap, pony_ctx_t* ctx)
 {
   memset(heap, 0, sizeof(heap_t));
-  heap->next_gc = heap_initialgc;
+  heap->next_gc = (size_t)((double)heap_initialgc * ctx->gc_fudge_factor);
+  ctx->gc_fudge_factor += 0.1;
+  if(ctx->gc_fudge_factor >= 2.0)
+    ctx->gc_fudge_factor = 1.0;
 }
 
 void ponyint_heap_destroy(heap_t* heap)
@@ -452,7 +456,7 @@ void ponyint_heap_free(chunk_t* chunk, void* p)
   }
 }
 
-void ponyint_heap_endgc(heap_t* heap)
+void ponyint_heap_endgc(heap_t* heap, pony_ctx_t* ctx)
 {
   size_t used = 0;
 
@@ -480,7 +484,11 @@ void ponyint_heap_endgc(heap_t* heap)
   // add local object sizes as well and set the next gc point for when memory
   // usage has increased.
   heap->used += used;
-  heap->next_gc = (size_t)((double)heap->used * heap_nextgc_factor);
+  //heap->next_gc = (size_t)((double)heap->used * heap_nextgc_factor);
+  heap->next_gc = (size_t)((double)heap->used * ctx->gc_fudge_factor);
+  ctx->gc_fudge_factor += 0.1;
+  if (ctx->gc_fudge_factor >= 2.0)
+    ctx->gc_fudge_factor = 1.0;
 
   if(heap->next_gc < heap_initialgc)
     heap->next_gc = heap_initialgc;
