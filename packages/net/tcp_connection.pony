@@ -156,13 +156,11 @@ actor TCPConnection
   var _connected: Bool = false
   var _readable: Bool = false
   var _writeable: Bool = false
-  var _throttled: Bool = false
   var _closed: Bool = false
   var _shutdown: Bool = false
   var _shutdown_peer: Bool = false
   var _in_sent: Bool = false
 
-  //TODO: figure out how to ifdef this
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -271,6 +269,7 @@ actor TCPConnection
     ifdef not windows then
       _pending_writev.push(data.cpointer().usize()).push(data.size())
       _pending_writev_total = _pending_writev_total + data.size()
+      _pending.push((data, 0))
     end
 
   be writev(data: ByteSeqIter) =>
@@ -289,6 +288,7 @@ actor TCPConnection
         for bytes in _notify.sentv(this, data).values() do
           _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
           _pending_writev_total = _pending_writev_total + bytes.size()
+          _pending.push((bytes, 0))
         end
 
         _pending_writes()
@@ -307,6 +307,7 @@ actor TCPConnection
       for bytes in _notify.sentv(this, data).values() do
         _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
         _pending_writev_total = _pending_writev_total + bytes.size()
+        _pending.push((bytes, 0))
       end
     end
 
@@ -427,7 +428,7 @@ actor TCPConnection
 
             // Don't call _complete_writes, as Windows will see this as a
             // closed connection.
-            ifdef linux then
+            ifdef not windows then
               if _pending_writes() then
                 //sent all data; release backpressure
                 _release_backpressure()
@@ -456,7 +457,7 @@ actor TCPConnection
       if AsioEvent.writeable(flags) then
         _writeable = true
         _complete_writes(arg)
-          ifdef linux then
+          ifdef not windows then
             if _pending_writes() then
               //sent all data; release backpressure
               _release_backpressure()
@@ -508,6 +509,7 @@ actor TCPConnection
       else
         _pending_writev.push(data.cpointer().usize()).push(data.size())
         _pending_writev_total = _pending_writev_total + data.size()
+        _pending.push((data, 0))
         _pending_writes()
       end
     end
@@ -590,11 +592,13 @@ actor TCPConnection
                 len = len - iov_s
                 _pending_writev.shift()
                 _pending_writev.shift()
+                _pending.shift()
                 _pending_writev_total = _pending_writev_total - iov_s
               else
                 _pending_writev.update(0, iov_p+len)
                 _pending_writev.update(1, iov_s-len)
                 _pending_writev_total = _pending_writev_total - len
+                len = 0
               end
             end
             _apply_backpressure()
@@ -603,9 +607,14 @@ actor TCPConnection
             _pending_writev_total = _pending_writev_total - bytes_to_send
             if _pending_writev_total == 0 then
               _pending_writev.clear()
+              _pending.clear()
               return true
             else
-              _pending_writev.remove(0, num_to_send*2)
+              for d in Range[USize](0, num_to_send, 1) do
+                _pending_writev.shift()
+                _pending_writev.shift()
+                _pending.shift()
+              end
             end
           end
         else
@@ -890,6 +899,7 @@ actor TCPConnection
       // Unsubscribe immediately and drop all pending writes.
       @pony_asio_event_unsubscribe(_event)
       _pending_writev.clear()
+      _pending.clear()
       _pending_writev_total = 0
       _readable = false
       _writeable = false
