@@ -189,8 +189,8 @@ void ponyint_heap_init(heap_t* heap, pony_ctx_t* ctx)
   memset(heap, 0, sizeof(heap_t));
   heap->next_gc = (size_t)((double)heap_initialgc * ctx->gc_fudge_factor);
   ctx->gc_fudge_factor += 0.1;
-  if(ctx->gc_fudge_factor >= 2.0)
-    ctx->gc_fudge_factor = 1.0;
+  if(ctx->gc_fudge_factor >= 2.5)
+    ctx->gc_fudge_factor = 1.5;
 }
 
 void ponyint_heap_destroy(heap_t* heap)
@@ -487,8 +487,8 @@ void ponyint_heap_endgc(heap_t* heap, pony_ctx_t* ctx)
   //heap->next_gc = (size_t)((double)heap->used * heap_nextgc_factor);
   heap->next_gc = (size_t)((double)heap->used * ctx->gc_fudge_factor);
   ctx->gc_fudge_factor += 0.1;
-  if (ctx->gc_fudge_factor >= 2.0)
-    ctx->gc_fudge_factor = 1.0;
+  if (ctx->gc_fudge_factor >= 2.5)
+    ctx->gc_fudge_factor = 1.5;
 
   if(heap->next_gc < heap_initialgc)
     heap->next_gc = heap_initialgc;
