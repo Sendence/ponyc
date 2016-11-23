@@ -20,6 +20,7 @@
 #include <mstcpip.h>
 #include <mswsock.h>
 #else
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -567,9 +568,13 @@ static bool os_connect(pony_actor_t* owner, int fd, struct addrinfo *p,
     pony_os_socket_close(fd);
     return false;
   }
-
+#ifdef PLATFORM_IS_LINUX
+  // Create an event and subscribe it.
+  pony_asio_event_create(owner, fd, ASIO_READ | ASIO_WRITE | ASIO_ONESHOT, 0, true);
+#else
   // Create an event and subscribe it.
   pony_asio_event_create(owner, fd, ASIO_READ | ASIO_WRITE, 0, true);
+#endif
 #endif
 
   return true;
@@ -873,6 +878,29 @@ bool pony_os_host_ip6(const char* host)
   struct in6_addr addr;
   return inet_pton(AF_INET6, host, &addr) == 1;
 }
+
+#ifndef PLATFORM_IS_WINDOWS
+int pony_os_writev_max()
+{
+  return IOV_MAX;
+}
+
+size_t pony_os_writev(asio_event_t* ev, const struct iovec *iov, int iovcnt)
+{
+  ssize_t sent = writev(ev->fd, iov, iovcnt);
+
+  if(sent < 0)
+  {
+    if(errno == EWOULDBLOCK)
+      return 0;
+
+    printf("writev error: %d, iovcnt: %d\n", errno, iovcnt);
+    pony_throw();
+  }
+
+  return (size_t)sent;
+}
+#endif
 
 size_t pony_os_send(asio_event_t* ev, const char* buf, size_t len)
 {

@@ -72,7 +72,8 @@ void ponyint_serialise_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
 {
   serialise_t k;
   k.key = (uintptr_t)p;
-  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k);
+  size_t index = HASHMAP_UNKNOWN;
+  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k, &index);
 
   if(s != NULL)
   {
@@ -88,7 +89,9 @@ void ponyint_serialise_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
     s->t = t;
     s->block = false;
 
-    ponyint_serialise_put(&ctx->serialise, s);
+    // didn't find it in the map but index is where we can put the
+    // new one without another search
+    ponyint_serialise_putindex(&ctx->serialise, s, index);
     ctx->serialise_size += t->size;
 
     if(t->custom_serialise_space)
@@ -118,7 +121,9 @@ void pony_serialise_reserve(pony_ctx_t* ctx, void* p, size_t size)
   // String and Array[A].
   serialise_t k;
   k.key = (uintptr_t)p;
-  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k);
+  size_t index = HASHMAP_UNKNOWN;
+
+  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k, &index);
 
   if(s != NULL)
     return;
@@ -131,7 +136,9 @@ void pony_serialise_reserve(pony_ctx_t* ctx, void* p, size_t size)
   s->mutability = PONY_TRACE_OPAQUE;
   s->block = true;
 
-  ponyint_serialise_put(&ctx->serialise, s);
+  // didn't find it in the map but index is where we can put the
+  // new one without another search
+  ponyint_serialise_putindex(&ctx->serialise, s, index);
   ctx->serialise_size += size;
 }
 
@@ -139,7 +146,8 @@ size_t pony_serialise_offset(pony_ctx_t* ctx, void* p)
 {
   serialise_t k;
   k.key = (uintptr_t)p;
-  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k);
+  size_t index = HASHMAP_UNKNOWN;
+  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k, &index);
 
   // If we are in the map, return the offset.
   if(s != NULL)
@@ -211,7 +219,8 @@ void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
   // Lookup the offset, return the associated object if there is one.
   serialise_t k;
   k.key = offset;
-  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k);
+  size_t index = HASHMAP_UNKNOWN;
+  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k, &index);
 
   if(s != NULL)
     return (void*)s->value;
@@ -250,8 +259,12 @@ void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
   s = POOL_ALLOC(serialise_t);
   s->key = offset;
   s->value = (uintptr_t)object;
+
   s->t = t;
-  ponyint_serialise_put(&ctx->serialise, s);
+
+  // didn't find it in the map but index is where we can put the
+  // new one without another search
+  ponyint_serialise_putindex(&ctx->serialise, s, index);
 
   recurse(ctx, object, t->deserialise);
 

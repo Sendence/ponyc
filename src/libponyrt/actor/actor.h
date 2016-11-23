@@ -31,6 +31,8 @@ typedef struct pony_actor_t
   gc_t gc; // 44/80 bytes
 } pony_actor_t;
 
+void set_noisey(pony_actor_t* actor);
+
 bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch);
 
 void ponyint_actor_destroy(pony_actor_t* actor);
