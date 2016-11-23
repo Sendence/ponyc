@@ -60,22 +60,11 @@ actor Main
 
   new val from_array(data: Array[U8] val, offset: USize = 0) =>
     """
-    Create a string from an array, reusing the underlying data pointer
+    Create a string from an array, reusing the underlying data pointer.
     """
     _size = data.size()
-
-    if
-      (_size > 0) and
-      try (data(_size - 1) == 0) else false end
-    then
-      _alloc = data.space()
-      _ptr = data.cpointer()._unsafe()
-    else
-      _alloc = _size + 1
-      _ptr = Pointer[U8]._alloc(_alloc)
-      data._copy_to(_ptr, _size)
-      _set(_size, 0)
-    end
+    _alloc = data.space()
+    _ptr = data.cpointer()._unsafe()
 
   new iso from_iso_array(data: Array[U8] iso) =>
     """
@@ -84,6 +73,9 @@ actor Main
     _size = data.size()
     _alloc = data.space()
     _ptr = (consume data).cpointer()._unsafe()
+    if _alloc > _size then
+      _set(_size, 0)
+    end
 
   new from_cpointer(str: Pointer[U8], len: USize, alloc: USize = 0) =>
     """

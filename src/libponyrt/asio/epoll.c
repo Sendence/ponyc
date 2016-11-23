@@ -15,6 +15,10 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#ifdef USE_VALGRIND
+#include <valgrind/helgrind.h>
+#endif
+
 #define MAX_SIGNAL 128
 
 struct asio_backend_t
@@ -50,6 +54,10 @@ static void signal_handler(int sig)
   asio_backend_t* b = ponyint_asio_get_backend();
   asio_event_t* ev = atomic_load_explicit(&b->sighandlers[sig],
     memory_order_acquire);
+
+#ifdef USE_VALGRIND
+  ANNOTATE_HAPPENS_AFTER(&b->sighandlers[sig]);
+#endif
 
   if(ev == NULL)
     return;
@@ -222,6 +230,9 @@ void pony_asio_event_subscribe(asio_event_t* ev)
     int sig = (int)ev->nsec;
     asio_event_t* prev = NULL;
 
+#ifdef USE_VALGRIND
+    ANNOTATE_HAPPENS_BEFORE(&b->sighandlers[sig]);
+#endif
     if((sig < MAX_SIGNAL) &&
       atomic_compare_exchange_strong_explicit(&b->sighandlers[sig], &prev, ev,
       memory_order_release, memory_order_relaxed))
@@ -286,6 +297,9 @@ void pony_asio_event_unsubscribe(asio_event_t* ev)
     int sig = (int)ev->nsec;
     asio_event_t* prev = ev;
 
+#ifdef USE_VALGRIND
+    ANNOTATE_HAPPENS_BEFORE(&b->sighandlers[sig]);
+#endif
     if((sig < MAX_SIGNAL) &&
       atomic_compare_exchange_strong_explicit(&b->sighandlers[sig], &prev, NULL,
       memory_order_release, memory_order_relaxed))
