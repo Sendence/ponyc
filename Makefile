@@ -393,7 +393,8 @@ ifeq ($(OSTYPE),linux)
 endif
 
 ifneq (, $(DTRACE))
-  $(shell $(DTRACE) -h -s $(PONY_SOURCE_DIR)/common/dtrace_probes.d -o $(PONY_SOURCE_DIR)/common/dtrace_probes.h)
+  src/common/dtrace_probes.h: src/common/dtrace_probes.d
+	$(SILENT)$(DTRACE) -h -s $(PONY_SOURCE_DIR)/common/dtrace_probes.d -o $(PONY_SOURCE_DIR)/common/dtrace_probes.h
 endif
 
 # Overwrite the default linker for a target.
