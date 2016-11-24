@@ -2,13 +2,13 @@ provider pony {
   /**
    * Fired when a actor is being created
    */
-  probe actor__alloc(uintptr_t scheduler);
+  probe actor__alloc(uintptr_t scheduler, uintptr_t actor, unsigned int type_id);
 
   /**
    * Fired when a message is being send
    * @param id the message id
    */
-  probe actor__msg__send(uintptr_t scheduler, uint32_t id);
+  probe actor__msg__send(uintptr_t scheduler, uint32_t id, uintptr_t from_actor, uintptr_t to_actor);
 
   /**
    * Fired when a message is being run by an actor
@@ -40,7 +40,7 @@ provider pony {
   /**
    * Fired when the garbage collection function is ending
    */
-  probe gc__end(uintptr_t scheduler);
+  probe gc__end(uintptr_t scheduler, uintptr_t actor, unsigned long heap_size);
 
   /**
    * Fired when the garbage collector finishes sending an object
@@ -65,7 +65,7 @@ provider pony {
   /**
    * Fired when the garbage collection function has started
    */
-  probe gc__start(uintptr_t scheduler);
+  probe gc__start(uintptr_t scheduler, uintptr_t actor, unsigned long heap_size);
 
   /**
    * Fired when the garbage collection threshold is changed with a certain factor
@@ -77,7 +77,7 @@ provider pony {
    * Fired when memory is allocated on the heap
    * @param size the size of the allocated memory
    */
-  probe heap__alloc(uintptr_t scheduler, unsigned long size);
+  probe heap__alloc(uintptr_t scheduler, unsigned long size, uintptr_t actor, unsigned long heap_size);
 
   /**
    * Fired when runtime initiates
