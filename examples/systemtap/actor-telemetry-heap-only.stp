@@ -1,0 +1,37 @@
+global actor_gc_passes, time_in_gc, alloc
+
+probe process.mark("gc-start")
+{
+    time_in_gc[$arg2, "heapsize"] = $arg3
+}
+
+probe process.mark("gc-end")
+{
+    time_in_gc[$arg2, "heapsize"] = $arg3
+}
+
+probe process.mark("heap-alloc")
+{
+    alloc[$arg3, "heapsize"] = $arg4
+}
+
+probe process.mark("actor-alloc")
+{
+    alloc[$arg2, "type_id"] = $arg3;
+    actor_gc_passes[$arg2] ++;
+}
+
+probe end
+{
+    printf("\"telemetry\" : [\n");
+    foreach (actor in actor_gc_passes) {
+      printf("  {\n");
+      printf("    \"actor_id\": %d,\n", actor);
+      printf("    \"type_id\": %d,\n", alloc[actor, "type_id"]);
+      printf("    \"last_alloc_heapsize\": %d,\n", alloc[actor, "heapsize"]);
+      printf("    \"last_gc_heapsize\": %d,\n", time_in_gc[actor, "heapsize"]);
+      printf("  },\n");
+    }
+    printf("]\n");
+}
+
