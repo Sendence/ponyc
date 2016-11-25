@@ -393,6 +393,9 @@ ifeq ($(OSTYPE),linux)
 endif
 
 ifneq (, $(DTRACE))
+  ifeq (,$(wildcard src/common/dtrace_probes.h))
+    $(shell $(DTRACE) -h -s $(PONY_SOURCE_DIR)/common/dtrace_probes.d -o $(PONY_SOURCE_DIR)/common/dtrace_probes.h)
+  endif
   src/common/dtrace_probes.h: src/common/dtrace_probes.d
 	$(SILENT)$(DTRACE) -h -s $(PONY_SOURCE_DIR)/common/dtrace_probes.d -o $(PONY_SOURCE_DIR)/common/dtrace_probes.h
 endif
