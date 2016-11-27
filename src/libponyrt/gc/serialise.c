@@ -252,7 +252,12 @@ void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
   }
 
   // Allocate the object, memcpy to it.
-  void* object = pony_alloc(ctx, t->size);
+  void* object;
+  if(t->final == NULL)
+    object = pony_alloc(ctx, t->size);
+  else
+    object = pony_alloc_final(ctx, t->size, t->final);
+
   memcpy(object, (void*)((uintptr_t)ctx->serialise_buffer + offset), t->size);
 
   // Store a mapping of offset to object.
