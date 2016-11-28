@@ -63,9 +63,9 @@ If you're using `docker-machine` instead of native docker, make sure you aren't 
 
 ## Linux using an RPM package (via Bintray)
 
-For Red Hat, CentOS, or Fedora Linux, the `master` and `release` branches are packaged and availabe on Bintray ([pony-language/ponyc-rpm](https://bintray.com/pony-language/ponyc-rpm)).
+For Red Hat, CentOS, Oracle Linux, or Fedora Linux, the `master` and `release` branches are packaged and available on Bintray ([pony-language/ponyc-rpm](https://bintray.com/pony-language/ponyc-rpm)).
 
-To install  release builds via Yum:
+To install release builds via Yum:
 ```bash
 wget https://bintray.com/pony-language/ponyc-rpm/rpm -O bintray-pony-language-ponyc-rpm.repo
 sudo mv bintray-pony-language-ponyc-rpm.repo /etc/yum.repos.d/
@@ -78,10 +78,9 @@ Or, for master builds:
 yum install ponyc-master
 ```
 
-
 ## Linux using a DEB package (via Bintray)
 
-For Ubuntu or Debian Linux, the `master` and `release` branches are packaged and availabe on Bintray ([pony-language/ponyc-debian](https://bintray.com/pony-language/ponyc-debian)).
+For Ubuntu or Debian Linux, the `master` and `release` branches are packaged and available on Bintray ([pony-language/ponyc-debian](https://bintray.com/pony-language/ponyc-debian)).
 
 To install release builds via Apt:
 
@@ -97,10 +96,9 @@ Or, for master builds:
 sudo apt-get install ponyc-master
 ```
 
-
 ## Windows using ZIP (via Bintray)
 
-For Windows, the `master` and `release` branches are packaged and availabe on Bintray ([pony-language/ponyc-win](https://bintray.com/pony-language/ponyc-win)):
+For Windows, the `master` and `release` branches are packaged and available on Bintray ([pony-language/ponyc-win](https://bintray.com/pony-language/ponyc-win)):
 
 ```powershell
 Invoke-WebRequest -Uri https://dl.bintray.com/pony-language/ponyc-win/ponyc-VERSION.zip -UseBasicParsing -OutFile ponyc-VERSION.zip
@@ -146,7 +144,7 @@ Pony requires one of the following versions of LLVM:
 - 3.6.2
 - 3.7.1
 - 3.8.1
-- 3.9.0 (unsupported on OSX at the moment)
+- 3.9.0
 
 Compiling Pony is only possible on x86 and ARM (either 32 or 64 bits).
 
@@ -395,6 +393,10 @@ Refer to your compiler documentation for the plugin to use in your case.
 Pony binaries can trigger illegal instruction errors under VirtualBox 4.x, for at least the x86_64 platform and possibly others.
 
 Use VirtualBox 5.x to avoid possible problems.
+
+## AVX2 Support
+
+The Pony prebuilt binaries trigger illegal instruction errors under CPUs without [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#Advanced_Vector_Extensions_2) support.
 
 ## Building Pony on Non-x86 platforms
 
