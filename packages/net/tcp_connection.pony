@@ -687,7 +687,6 @@ actor TCPConnection
       end
     end
 
-
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,
@@ -760,8 +759,14 @@ actor TCPConnection
             while (_expect_read_buf.size() > 0) and
               (_expect_read_buf.size() >= _expect)
             do
-              let out = _expect_read_buf.block(_expect)
-              let osize = _expect
+              let block_size = if _expect != 0 then
+                _expect
+              else
+                _expect_read_buf.size()
+              end
+
+              let out = _expect_read_buf.block(block_size)
+              let osize = block_size
 
               let carry_on = _notify.received(this, consume out)
               ifdef osx then
