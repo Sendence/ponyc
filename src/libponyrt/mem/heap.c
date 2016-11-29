@@ -348,7 +348,7 @@ void ponyint_heap_used(heap_t* heap, size_t size)
 
 bool ponyint_heap_startgc(heap_t* heap)
 {
-  if(heap->used <= heap->next_gc)
+  if((heap->used + heap->baseline) <= heap->next_gc)
     return false;
 
   for(int i = 0; i < HEAP_SIZECLASSES; i++)
@@ -482,7 +482,10 @@ void ponyint_heap_endgc(heap_t* heap)
   // add local object sizes as well and set the next gc point for when memory
   // usage has increased.
   heap->used += used;
-  heap->next_gc = (size_t)((double)heap->used * heap_nextgc_factor);
+  if (heap->baseline == 0)
+    heap->baseline = heap->used;
+
+  heap->next_gc = (size_t)((double)(heap->used - heap->baseline) * heap_nextgc_factor);
 
   if(heap->next_gc < heap_initialgc)
     heap->next_gc = heap_initialgc;

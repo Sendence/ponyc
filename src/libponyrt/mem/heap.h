@@ -25,6 +25,7 @@ typedef struct heap_t
 
   size_t used;
   size_t next_gc;
+  size_t baseline;
 } heap_t;
 
 uint32_t ponyint_heap_index(size_t size);
