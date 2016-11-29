@@ -189,6 +189,7 @@ void ponyint_heap_init(heap_t* heap)
 {
   memset(heap, 0, sizeof(heap_t));
   heap->next_gc = heap_initialgc;
+  heap->baseline = 350000;
 }
 
 void ponyint_heap_destroy(heap_t* heap)
