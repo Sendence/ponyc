@@ -11,16 +11,6 @@ static bool valid(void* entry)
   return ((uintptr_t)entry) > ((uintptr_t)DELETED);
 }
 
-// horrible horrible pointer math function to get element at position
-static rt_hashmap_entry_t* get_element_at_position(rt_hashmap_entry_t* buckets, size_t pos)
-{
-  // horrible horrible pointer math
-  return (buckets + pos);
-//  rt_hashmap_entry_t* elem = (rt_hashmap_entry_t*)(buckets + pos);
-//  printf("bucket: %lu, elem %lu, pos: %lu\n", (uintptr_t)buckets, (uintptr_t)elem, pos);
-//  return elem;
-}
-
 static void* search(rt_hashmap_t* map, size_t* pos, uintptr_t key, rt_hash_fn hash)
 {
   size_t index_del = map->size;
@@ -28,13 +18,10 @@ static void* search(rt_hashmap_t* map, size_t* pos, uintptr_t key, rt_hash_fn ha
 
   size_t h = hash(key);
   size_t index = h & mask;
-  rt_hashmap_entry_t* elem;
 
   for(size_t i = 0; i <= mask; i++)
   {
-    elem = get_element_at_position(map->buckets, index);
-
-    if(elem->ptr == NULL)
+    if(map->buckets[index].ptr == NULL)
     {
       if(index_del <= mask)
         *pos = index_del;
@@ -42,15 +29,13 @@ static void* search(rt_hashmap_t* map, size_t* pos, uintptr_t key, rt_hash_fn ha
         *pos = index;
 
       return NULL;
-    } else if(elem->ptr == DELETED) {
+    } else if(map->buckets[index].ptr == DELETED) {
       /* some element was here, remember the first deleted slot */
       if(index_del > mask)
         index_del = index;
-    } else if(key == elem->data) {
+    } else if(key == map->buckets[index].data) {
       *pos = index;
-      return elem->ptr;
-    } else {
-//      printf("@@@This shouldn't happen! pos: %lu, ptr: %lu, data: %lu, key: %lu\n", index, (uintptr_t)elem->ptr, elem->data, key);
+      return map->buckets[index].ptr;
     }
 
     index = (h + ((i + (i * i)) >> 1)) & mask;
@@ -66,7 +51,6 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
   size_t s = map->size;
 //  size_t c = map->count;
   rt_hashmap_entry_t* b = map->buckets;
-  rt_hashmap_entry_t* curr = NULL;
 
   map->count = 0;
   map->size = (s < 8) ? 8 : s << 3;
@@ -75,10 +59,8 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
 
   for(size_t i = 0; i < s; i++)
   {
-    curr = get_element_at_position(b, i);
-
-    if(valid(curr->ptr))
-      ponyint_rt_hashmap_put(map, curr->ptr, curr->data, hash, alloc, fr);
+    if(valid(b[i].ptr))
+      ponyint_rt_hashmap_put(map, b[i].ptr, b[i].data, hash, alloc, fr);
   }
 
   if((fr != NULL) && (b != NULL))
@@ -116,14 +98,10 @@ void ponyint_rt_hashmap_destroy(rt_hashmap_t* map, free_size_fn fr, free_fn free
 {
   if(free_elem != NULL)
   {
-    rt_hashmap_entry_t* elem = NULL;
-
     for(size_t i = 0; i < map->size; i++)
     {
-      elem = get_element_at_position(map->buckets, i);
-
-      if(elem != NULL && valid(elem->ptr))
-        free_elem(elem->ptr);
+      if(valid(map->buckets[i].ptr))
+        free_elem(map->buckets[i].ptr);
     }
   }
 
@@ -152,10 +130,8 @@ void* ponyint_rt_hashmap_put(rt_hashmap_t* map, void* entry, uintptr_t key, rt_h
   size_t pos;
   void* elem = search(map, &pos, key, hash);
 
-  rt_hashmap_entry_t* pos_entry = get_element_at_position(map->buckets, pos);
-
-  pos_entry->ptr = entry;
-  pos_entry->data = key;
+  map->buckets[pos].ptr = entry;
+  map->buckets[pos].data = key;
 
   if(elem == NULL)
   {
@@ -182,11 +158,10 @@ void* ponyint_rt_hashmap_putindex(rt_hashmap_t* map, void* entry, uintptr_t key,
 
   assert(pos <= map->size);
 
-  rt_hashmap_entry_t* pos_entry = get_element_at_position(map->buckets, pos);
-  void* elem = pos_entry->ptr;
+  void* elem = map->buckets[pos].ptr;
 
-  pos_entry->ptr = entry;
-  pos_entry->data = key;
+  map->buckets[pos].ptr = entry;
+  map->buckets[pos].data = key;
 
   if(elem == DELETED || elem == 0)
   {
@@ -211,8 +186,7 @@ void* ponyint_rt_hashmap_remove(rt_hashmap_t* map, uintptr_t key, rt_hash_fn has
 
   if(elem != NULL)
   {
-    rt_hashmap_entry_t* pos_entry = get_element_at_position(map->buckets, pos);
-    pos_entry->ptr = DELETED;
+    map->buckets[pos].ptr = DELETED;
     map->count--;
   }
 
@@ -224,13 +198,12 @@ void* ponyint_rt_hashmap_removeindex(rt_hashmap_t* map, size_t index)
   if(map->size <= index)
     return NULL;
 
-  rt_hashmap_entry_t* pos_entry = get_element_at_position(map->buckets, index);
-  void* elem = pos_entry->ptr;
+  void* elem = map->buckets[index].ptr;
 
   if(!valid(elem))
     return NULL;
 
-  pos_entry->ptr = DELETED;
+  map->buckets[index].ptr = DELETED;
   map->count--;
   return elem;
 }
@@ -241,13 +214,11 @@ void* ponyint_rt_hashmap_next(rt_hashmap_t* map, size_t* i)
     return NULL;
 
   void* elem = NULL;
-  rt_hashmap_entry_t* pos_entry = NULL;
   size_t index = *i + 1;
 
   while(index < map->size)
   {
-    pos_entry = get_element_at_position(map->buckets, index);
-    elem = pos_entry->ptr;
+    elem = map->buckets[index].ptr;
 
     if(valid(elem))
     {
