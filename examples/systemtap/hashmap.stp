@@ -1,0 +1,48 @@
+global hashmap, hashmap_list, hashmap_probes
+
+probe process.mark("hash-collision")
+{   
+    hashmap[$arg1, "collision"] ++;
+    hashmap_list[$arg1] ++;
+}
+
+probe process.mark("hash-success")
+{
+    hashmap[$arg1, "success"] ++;
+    hashmap_probes[$arg1] <<< $arg3;
+    hashmap[$arg1, "size"] = $arg2;
+    hashmap_list[$arg1] ++;
+}
+
+probe process.mark("hash-fail")
+{
+    hashmap[$arg1, "failure"] ++;
+    hashmap_probes[$arg1] <<< $arg3;
+    hashmap[$arg1, "size"] = $arg2;
+    hashmap_list[$arg1] ++;
+}
+
+probe process.mark("hash-resize")
+{   
+    hashmap[$arg1, "resize"] = $arg2;
+    hashmap_list[$arg1] ++;
+}
+
+probe end
+{
+    printf("\"telemetry\" : [\n");
+    foreach (map in hashmap_list) {
+      printf("  {\n");
+      printf("    \"hashmap_id\": %d,\n", map);
+      printf("    \"resized from old hashmap\": %d,\n", hashmap[map, "resize"]);
+      printf("    \"num_entries\": %d,\n", hashmap[map, "size"]);
+      printf("    \"count_success\": %d,\n", hashmap[map, "success"]);
+      printf("    \"count_failure\": %d,\n", hashmap[map, "failure"]);
+      printf("    \"count_collision\": %d,\n", hashmap[map, "collision"]);
+      printf("    \"probe count histogram\":\n");
+	print(@hist_log(hashmap_probes[map]));
+      printf("  },\n");
+    }
+    printf("]\n");
+}
+

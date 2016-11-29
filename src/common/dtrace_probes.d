@@ -1,5 +1,25 @@
 provider pony {
   /**
+   * Fired when a hashmap has a collision
+   */
+  probe hash__collision(uintptr_t hashmap);
+
+  /**
+   * Fired when a hashmap finds an entry
+   */
+  probe hash__success(uintptr_t hashmap, size_t size, size_t num_probes);
+
+  /**
+   * Fired when a hashmap doesn't find an entry
+   */
+  probe hash__fail(uintptr_t hashmap, size_t size, size_t num_probes);
+
+  /**
+   * Fired when a hashmap doesn't find an entry
+   */
+  probe hash__resize(uintptr_t from, uintptr_t to);
+
+  /**
    * Fired when a actor is being created
    */
   probe actor__alloc(uintptr_t scheduler, uintptr_t actor, unsigned int type_id);

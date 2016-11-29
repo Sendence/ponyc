@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <dtrace.h>
+
 
 #define DELETED ((void*)1)
 
@@ -15,6 +17,7 @@ static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
 {
   size_t index_del = map->size;
   size_t mask = index_del - 1;
+  size_t num_probes = 0;
 
   size_t h = hash(key);
   size_t index = h & mask;
@@ -23,6 +26,7 @@ static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
   for(size_t i = 0; i <= mask; i++)
   {
     elem = map->buckets[index];
+    num_probes++;
 
     if(elem == NULL)
     {
@@ -31,17 +35,34 @@ static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
       else
         *pos = index;
 
+      if(map->count > 4000)
+      {
+        DTRACE3(HASH_FAIL, (uintptr_t)map->buckets, map->count, num_probes);
+      }
       return NULL;
     } else if(elem == DELETED) {
       /* some element was here, remember the first deleted slot */
       if(index_del > mask)
         index_del = index;
     } else if(cmp(key, elem)) {
+      if(map->count > 4000)
+      {
+        DTRACE3(HASH_SUCCESS, (uintptr_t)map->buckets, map->count, num_probes);
+      }
       *pos = index;
       return elem;
     }
 
     index = (h + ((i + (i * i)) >> 1)) & mask;
+    if(map->count > 4000)
+    {
+      DTRACE1(HASH_COLLISION, (uintptr_t)map->buckets);
+    }
+  }
+
+  if(map->count > 4000)
+  {
+    DTRACE3(HASH_FAIL, (uintptr_t)map->buckets, map->count, num_probes);
   }
 
   *pos = index_del;
@@ -66,6 +87,11 @@ static void resize(hashmap_t* map, hash_fn hash, cmp_fn cmp, alloc_fn alloc,
 
     if(valid(curr))
       ponyint_hashmap_put(map, curr, hash, cmp, alloc, fr);
+  }
+
+  if(map->count > 4000)
+  {
+    DTRACE2(HASH_RESIZE, (uintptr_t)b, (uintptr_t)map->buckets);
   }
 
   if((fr != NULL) && (b != NULL))
