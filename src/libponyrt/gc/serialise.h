@@ -7,7 +7,7 @@ PONY_EXTERN_C_BEGIN
 
 typedef struct serialise_t serialise_t;
 
-DECLARE_HASHMAP(ponyint_serialise, ponyint_serialise_t, serialise_t);
+DECLARE_RT_HASHMAP(ponyint_serialise, ponyint_serialise_t, serialise_t);
 
 void ponyint_serialise_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
   int mutability);

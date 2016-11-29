@@ -1,19 +1,14 @@
 #include "objectmap.h"
 #include "gc.h"
-#include "../ds/hash.h"
+#include "../ds/rt_hash.h"
 #include "../ds/fun.h"
 #include "../mem/pool.h"
 #include "../mem/pagemap.h"
 #include <assert.h>
 
-static size_t object_hash(object_t* obj)
+static size_t object_hash(uintptr_t address)
 {
-  return ponyint_hash_ptr(obj->address);
-}
-
-static bool object_cmp(object_t* a, object_t* b)
-{
-  return a->address == b->address;
+  return ponyint_hash_ptr((void *)address);
 }
 
 static object_t* object_alloc(void* address, uint32_t mark)
@@ -34,28 +29,25 @@ static void object_free(object_t* obj)
   POOL_FREE(object_t, obj);
 }
 
-DEFINE_HASHMAP(ponyint_objectmap, objectmap_t, object_t, object_hash,
-  object_cmp, ponyint_pool_alloc_size, ponyint_pool_free_size, object_free);
+DEFINE_RT_HASHMAP(ponyint_objectmap, objectmap_t, object_t, object_hash,
+  ponyint_pool_alloc_size, ponyint_pool_free_size, object_free);
 
 object_t* ponyint_objectmap_getobject(objectmap_t* map, void* address, size_t* index)
 {
-  object_t obj;
-  obj.address = address;
-
-  return ponyint_objectmap_get(map, &obj, index);
+  return ponyint_objectmap_get(map, (uintptr_t)address, index);
 }
 
 object_t* ponyint_objectmap_getorput(objectmap_t* map, void* address,
   uint32_t mark)
 {
-  size_t index = HASHMAP_UNKNOWN;
+  size_t index = RT_HASHMAP_UNKNOWN;
   object_t* obj = ponyint_objectmap_getobject(map, address, &index);
 
   if(obj != NULL)
     return obj;
 
   obj = object_alloc(address, mark);
-  ponyint_objectmap_putindex(map, obj, index);
+  ponyint_objectmap_putindex(map, obj, (uintptr_t)address, index);
   return obj;
 }
 
@@ -69,7 +61,7 @@ object_t* ponyint_objectmap_register_final(objectmap_t* map, void* address,
 
 void ponyint_objectmap_final(objectmap_t* map)
 {
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   object_t* obj;
 
   while((obj = ponyint_objectmap_next(map, &i)) != NULL)
@@ -82,7 +74,7 @@ void ponyint_objectmap_final(objectmap_t* map)
 size_t ponyint_objectmap_sweep(objectmap_t* map)
 {
   size_t count = 0;
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   object_t* obj;
 
   while((obj = ponyint_objectmap_next(map, &i)) != NULL)

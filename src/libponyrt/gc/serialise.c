@@ -29,14 +29,9 @@ struct serialise_t
   int mutability;
 };
 
-static size_t serialise_hash(serialise_t* p)
+static size_t serialise_hash(uintptr_t key)
 {
-  return ponyint_hash_size(p->key);
-}
-
-static bool serialise_cmp(serialise_t* a, serialise_t* b)
-{
-  return a->key == b->key;
+  return ponyint_hash_size(key);
 }
 
 static void serialise_free(serialise_t* p)
@@ -44,8 +39,8 @@ static void serialise_free(serialise_t* p)
   POOL_FREE(serialise_t, p);
 }
 
-DEFINE_HASHMAP(ponyint_serialise, ponyint_serialise_t,
-  serialise_t, serialise_hash, serialise_cmp,
+DEFINE_RT_HASHMAP(ponyint_serialise, ponyint_serialise_t,
+  serialise_t, serialise_hash,
   ponyint_pool_alloc_size, ponyint_pool_free_size, serialise_free);
 
 static void recurse(pony_ctx_t* ctx, void* p, void* f)
@@ -76,10 +71,8 @@ void ponyint_serialise_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
     return;
   }
 
-  serialise_t k;
-  k.key = (uintptr_t)p;
-  size_t index = HASHMAP_UNKNOWN;
-  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k, &index);
+  size_t index = RT_HASHMAP_UNKNOWN;
+  serialise_t* s = ponyint_serialise_get(&ctx->serialise, (uintptr_t)p, &index);
 
   if(s != NULL)
   {
@@ -96,7 +89,7 @@ void ponyint_serialise_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
 
     // didn't find it in the map but index is where we can put the
     // new one without another search
-    ponyint_serialise_putindex(&ctx->serialise, s, index);
+    ponyint_serialise_putindex(&ctx->serialise, s, (uintptr_t)p, index);
     ctx->serialise_size += t->size;
   }
 
@@ -119,11 +112,9 @@ void pony_serialise_reserve(pony_ctx_t* ctx, void* p, size_t size)
 {
   // Reserve a block of memory to serialise into. This is only needed for
   // String and Array[A].
-  serialise_t k;
-  k.key = (uintptr_t)p;
-  size_t index = HASHMAP_UNKNOWN;
+  size_t index = RT_HASHMAP_UNKNOWN;
 
-  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k, &index);
+  serialise_t* s = ponyint_serialise_get(&ctx->serialise, (uintptr_t)p, &index);
 
   if(s != NULL)
     return;
@@ -137,16 +128,14 @@ void pony_serialise_reserve(pony_ctx_t* ctx, void* p, size_t size)
 
   // didn't find it in the map but index is where we can put the
   // new one without another search
-  ponyint_serialise_putindex(&ctx->serialise, s, index);
+  ponyint_serialise_putindex(&ctx->serialise, s, (uintptr_t)p, index);
   ctx->serialise_size += size;
 }
 
 size_t pony_serialise_offset(pony_ctx_t* ctx, void* p)
 {
-  serialise_t k;
-  k.key = (uintptr_t)p;
-  size_t index = HASHMAP_UNKNOWN;
-  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k, &index);
+  size_t index = RT_HASHMAP_UNKNOWN;
+  serialise_t* s = ponyint_serialise_get(&ctx->serialise, (uintptr_t)p, &index);
 
   // If we are in the map, return the offset.
   if(s != NULL)
@@ -174,7 +163,7 @@ void pony_serialise(pony_ctx_t* ctx, void* p, void* out)
   r->alloc = r->size;
   r->ptr = (char*)pony_alloc(ctx, r->size);
 
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   serialise_t* s;
 
   while((s = ponyint_serialise_next(&ctx->serialise, &i)) != NULL)
@@ -206,10 +195,8 @@ void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
   }
 
   // Lookup the offset, return the associated object if there is one.
-  serialise_t k;
-  k.key = offset;
-  size_t index = HASHMAP_UNKNOWN;
-  serialise_t* s = ponyint_serialise_get(&ctx->serialise, &k, &index);
+  size_t index = RT_HASHMAP_UNKNOWN;
+  serialise_t* s = ponyint_serialise_get(&ctx->serialise, offset, &index);
 
   if(s != NULL)
     return (void*)s->value;
@@ -251,7 +238,7 @@ void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
 
   // didn't find it in the map but index is where we can put the
   // new one without another search
-  ponyint_serialise_putindex(&ctx->serialise, s, index);
+  ponyint_serialise_putindex(&ctx->serialise, s, offset, index);
 
   recurse(ctx, object, t->deserialise);
   return object;

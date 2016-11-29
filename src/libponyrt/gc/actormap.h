@@ -5,7 +5,7 @@
 
 #include "objectmap.h"
 #include "delta.h"
-#include "../ds/hash.h"
+#include "../ds/rt_hash.h"
 
 PONY_EXTERN_C_BEGIN
 
@@ -24,7 +24,7 @@ object_t* ponyint_actorref_getorput(actorref_t* aref, void* address,
 
 void ponyint_actorref_free(actorref_t* aref);
 
-DECLARE_HASHMAP(ponyint_actormap, actormap_t, actorref_t);
+DECLARE_RT_HASHMAP(ponyint_actormap, actormap_t, actorref_t);
 
 actorref_t* ponyint_actormap_getactor(actormap_t* map, pony_actor_t* actor, size_t* index);
 

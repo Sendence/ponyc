@@ -3,7 +3,7 @@
 #include "../actor/actor.h"
 #include "../sched/scheduler.h"
 #include "../ds/stack.h"
-#include "../ds/hash.h"
+#include "../ds/rt_hash.h"
 #include "../mem/pool.h"
 #include <stdio.h>
 #include <string.h>
@@ -35,14 +35,9 @@ typedef struct viewref_t
   size_t rc;
 } viewref_t;
 
-static size_t viewref_hash(viewref_t* vref)
+static size_t viewref_hash(uintptr_t view)
 {
-  return ponyint_hash_ptr(vref->view);
-}
-
-static bool viewref_cmp(viewref_t* a, viewref_t* b)
-{
-  return a->view == b->view;
+  return ponyint_hash_ptr((void *)view);
 }
 
 static void viewref_free(viewref_t* vref)
@@ -53,9 +48,9 @@ static void viewref_free(viewref_t* vref)
 DECLARE_STACK(ponyint_viewrefstack, viewrefstack_t, viewref_t);
 DEFINE_STACK(ponyint_viewrefstack, viewrefstack_t, viewref_t);
 
-DECLARE_HASHMAP(ponyint_viewrefmap, viewrefmap_t, viewref_t);
-DEFINE_HASHMAP(ponyint_viewrefmap, viewrefmap_t, viewref_t, viewref_hash,
-  viewref_cmp, ponyint_pool_alloc_size, ponyint_pool_free_size, viewref_free);
+DECLARE_RT_HASHMAP(ponyint_viewrefmap, viewrefmap_t, viewref_t);
+DEFINE_RT_HASHMAP(ponyint_viewrefmap, viewrefmap_t, viewref_t, viewref_hash,
+  ponyint_pool_alloc_size, ponyint_pool_free_size, viewref_free);
 
 enum
 {
@@ -77,14 +72,9 @@ struct view_t
   perceived_t* perceived;
 };
 
-static size_t view_hash(view_t* view)
+static size_t view_hash(uintptr_t actor)
 {
-  return ponyint_hash_ptr(view->actor);
-}
-
-static bool view_cmp(view_t* a, view_t* b)
-{
-  return a->actor == b->actor;
+  return ponyint_hash_ptr((void *)actor);
 }
 
 static void view_free(view_t* view)
@@ -106,8 +96,8 @@ static void view_free(view_t* view)
 }
 
 // no element free for a viewmap. views are kept in many maps.
-DECLARE_HASHMAP(ponyint_viewmap, viewmap_t, view_t);
-DEFINE_HASHMAP(ponyint_viewmap, viewmap_t, view_t, view_hash, view_cmp,
+DECLARE_RT_HASHMAP(ponyint_viewmap, viewmap_t, view_t);
+DEFINE_RT_HASHMAP(ponyint_viewmap, viewmap_t, view_t, view_hash,
   ponyint_pool_alloc_size, ponyint_pool_free_size, NULL);
 
 struct perceived_t
@@ -118,14 +108,9 @@ struct perceived_t
   viewmap_t map;
 };
 
-static size_t perceived_hash(perceived_t* per)
+static size_t perceived_hash(uintptr_t token)
 {
-  return ponyint_hash_size(per->token);
-}
-
-static bool perceived_cmp(perceived_t* a, perceived_t* b)
-{
-  return a->token == b->token;
+  return ponyint_hash_size(token);
 }
 
 static void perceived_free(perceived_t* per)
@@ -134,9 +119,9 @@ static void perceived_free(perceived_t* per)
   POOL_FREE(perceived_t, per);
 }
 
-DECLARE_HASHMAP(ponyint_perceivedmap, perceivedmap_t, perceived_t);
-DEFINE_HASHMAP(ponyint_perceivedmap, perceivedmap_t, perceived_t,
-  perceived_hash, perceived_cmp, ponyint_pool_alloc_size,
+DECLARE_RT_HASHMAP(ponyint_perceivedmap, perceivedmap_t, perceived_t);
+DEFINE_RT_HASHMAP(ponyint_perceivedmap, perceivedmap_t, perceived_t,
+  perceived_hash, ponyint_pool_alloc_size,
   ponyint_pool_free_size, perceived_free);
 
 typedef struct detector_t
@@ -166,11 +151,9 @@ static pony_actor_t* cycle_detector;
 
 static view_t* get_view(detector_t* d, pony_actor_t* actor, bool create)
 {
-  view_t key;
-  key.actor = actor;
-  size_t index = HASHMAP_UNKNOWN;
+  size_t index = RT_HASHMAP_UNKNOWN;
 
-  view_t* view = ponyint_viewmap_get(&d->views, &key, &index);
+  view_t* view = ponyint_viewmap_get(&d->views, (uintptr_t)actor, &index);
 
   if((view == NULL) && create)
   {
@@ -181,7 +164,7 @@ static view_t* get_view(detector_t* d, pony_actor_t* actor, bool create)
 
     // didn't find it in the map but index is where we can put the
     // new one without another search
-    ponyint_viewmap_putindex(&d->views, view, index);
+    ponyint_viewmap_putindex(&d->views, view, (uintptr_t)actor, index);
     d->created++;
   }
 
@@ -196,7 +179,7 @@ static void apply_delta(detector_t* d, view_t* view)
     return;
 
   // update refs with delta
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   delta_t* delta;
 
   while((delta = ponyint_deltamap_next(map, &i)) != NULL)
@@ -212,13 +195,10 @@ static void apply_delta(detector_t* d, view_t* view)
     if(find == NULL)
       continue;
 
-    viewref_t key;
-    key.view = find;
-
     if(rc > 0)
     {
-      size_t index = HASHMAP_UNKNOWN;
-      viewref_t* ref = ponyint_viewrefmap_get(&view->map, &key, &index);
+      size_t index = RT_HASHMAP_UNKNOWN;
+      viewref_t* ref = ponyint_viewrefmap_get(&view->map, (uintptr_t)find, &index);
 
       if(ref == NULL)
       {
@@ -227,13 +207,13 @@ static void apply_delta(detector_t* d, view_t* view)
 
         // didn't find it in the map but index is where we can put the
         // new one without another search
-        ponyint_viewrefmap_putindex(&view->map, ref, index);
+        ponyint_viewrefmap_putindex(&view->map, ref, (uintptr_t)find, index);
         find->view_rc++;
       }
 
       ref->rc = rc;
     } else {
-      viewref_t* ref = ponyint_viewrefmap_remove(&view->map, &key);
+      viewref_t* ref = ponyint_viewrefmap_remove(&view->map, (uintptr_t)find);
 
       if(ref != NULL)
       {
@@ -257,7 +237,7 @@ static bool mark_grey(detector_t* d, view_t* view, size_t rc)
 
   if(view->deferred)
   {
-    ponyint_viewmap_remove(&d->deferred, view);
+    ponyint_viewmap_remove(&d->deferred, (uintptr_t)view->actor);
     view->deferred = false;
   }
 
@@ -285,7 +265,7 @@ static void scan_grey(detector_t* d, view_t* view, size_t rc)
 
     if(mark_grey(d, ref->view, ref->rc))
     {
-      size_t i = HASHMAP_BEGIN;
+      size_t i = RT_HASHMAP_BEGIN;
       viewref_t* child;
 
       while((child = ponyint_viewrefmap_next(&ref->view->map, &i)) != NULL)
@@ -329,7 +309,7 @@ static int scan_black(view_t* view, size_t rc)
 
     if(mark_black(ref->view, ref->rc, &count))
     {
-      size_t i = HASHMAP_BEGIN;
+      size_t i = RT_HASHMAP_BEGIN;
       viewref_t* child;
 
       while((child = ponyint_viewrefmap_next(&ref->view->map, &i)) != NULL)
@@ -375,7 +355,7 @@ static int scan_white(view_t* view)
 
     if(mark_white(ref->view, &count))
     {
-      size_t i = HASHMAP_BEGIN;
+      size_t i = RT_HASHMAP_BEGIN;
       viewref_t* child;
 
       while((child = ponyint_viewrefmap_next(&ref->view->map, &i)) != NULL)
@@ -394,7 +374,7 @@ static bool collect_view(perceived_t* per, view_t* view, size_t rc, int* count)
     assert(view->perceived == NULL);
 
     view->perceived = per;
-    ponyint_viewmap_put(&per->map, view);
+    ponyint_viewmap_put(&per->map, view, (uintptr_t)view->actor);
   }
 
   return mark_black(view, rc, count);
@@ -414,7 +394,7 @@ static int collect_white(perceived_t* per, view_t* view, size_t rc)
 
     if(collect_view(per, ref->view, ref->rc, &count))
     {
-      size_t i = HASHMAP_BEGIN;
+      size_t i = RT_HASHMAP_BEGIN;
       viewref_t* child;
 
       while((child = ponyint_viewrefmap_next(&ref->view->map, &i)) != NULL)
@@ -459,9 +439,9 @@ static bool detect(pony_ctx_t* ctx, detector_t* d, view_t* view)
   perceived_t* per = (perceived_t*)POOL_ALLOC(perceived_t);
   per->token = d->next_token++;
   per->ack = 0;
-  per->last_conf = HASHMAP_BEGIN;
+  per->last_conf = RT_HASHMAP_BEGIN;
   ponyint_viewmap_init(&per->map, count);
-  ponyint_perceivedmap_put(&d->perceived, per);
+  ponyint_perceivedmap_put(&d->perceived, per, (uintptr_t)per->token);
 
   int count2 = collect_white(per, view, 0);
 
@@ -483,7 +463,7 @@ static void deferred(pony_ctx_t* ctx, detector_t* d)
   d->attempted++;
 
   bool found = false;
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   view_t* view;
 
   while((view = ponyint_viewmap_next(&d->deferred, &i)) != NULL)
@@ -517,22 +497,22 @@ static void expire(detector_t* d, view_t* view)
   if(per == NULL)
     return;
 
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   view_t* pview;
 
   while((pview = ponyint_viewmap_next(&per->map, &i)) != NULL)
     pview->perceived = NULL;
 
-  ponyint_perceivedmap_remove(&d->perceived, per);
+  ponyint_perceivedmap_remove(&d->perceived, (uintptr_t)per->token);
   perceived_free(per);
   view->perceived = NULL;
 }
 
 static void collect(pony_ctx_t* ctx, detector_t* d, perceived_t* per)
 {
-  ponyint_perceivedmap_remove(&d->perceived, per);
+  ponyint_perceivedmap_remove(&d->perceived, (uintptr_t)per->token);
 
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   view_t* view;
 
   // mark actors in the cycle as pending destruction
@@ -542,7 +522,7 @@ static void collect(pony_ctx_t* ctx, detector_t* d, perceived_t* per)
 
     // remove from the deferred set
     if(view->deferred)
-      ponyint_viewmap_remove(&d->deferred, view);
+      ponyint_viewmap_remove(&d->deferred, (uintptr_t)view->actor);
 
     // invoke the actor's finalizer
     ponyint_actor_setpendingdestroy(view->actor);
@@ -551,18 +531,18 @@ static void collect(pony_ctx_t* ctx, detector_t* d, perceived_t* per)
 
   // actors being collected that have references to actors that are not in
   // the cycle now send ponyint_gc_release messages to those actors
-  i = HASHMAP_BEGIN;
+  i = RT_HASHMAP_BEGIN;
 
   while((view = ponyint_viewmap_next(&per->map, &i)) != NULL)
     ponyint_actor_sendrelease(ctx, view->actor);
 
   // destroy the actor and free the view on the actor
-  i = HASHMAP_BEGIN;
+  i = RT_HASHMAP_BEGIN;
 
   while((view = ponyint_viewmap_next(&per->map, &i)) != NULL)
   {
     ponyint_actor_destroy(view->actor);
-    ponyint_viewmap_remove(&d->views, view);
+    ponyint_viewmap_remove(&d->views, (uintptr_t)view->actor);
     view_free(view);
   }
 
@@ -599,7 +579,7 @@ static void block(pony_ctx_t* ctx, detector_t* d, pony_actor_t* actor,
     // remove from the deferred set
     if(view->deferred)
     {
-      ponyint_viewmap_remove(&d->deferred, view);
+      ponyint_viewmap_remove(&d->deferred, (uintptr_t)view->actor);
       view->deferred = false;
     }
 
@@ -609,7 +589,7 @@ static void block(pony_ctx_t* ctx, detector_t* d, pony_actor_t* actor,
     // add to the deferred set
     if(!view->deferred)
     {
-      ponyint_viewmap_put(&d->deferred, view);
+      ponyint_viewmap_put(&d->deferred, view, (uintptr_t)view->actor);
       view->deferred = true;
     }
 
@@ -620,12 +600,10 @@ static void block(pony_ctx_t* ctx, detector_t* d, pony_actor_t* actor,
 
 static void unblock(detector_t* d, pony_actor_t* actor)
 {
-  view_t key;
-  key.actor = actor;
-  size_t index = HASHMAP_UNKNOWN;
+  size_t index = RT_HASHMAP_UNKNOWN;
 
   // we must be in the views, because we must have blocked in order to unblock
-  view_t* view = ponyint_viewmap_get(&d->views, &key, &index);
+  view_t* view = ponyint_viewmap_get(&d->views, (uintptr_t)actor, &index);
   assert(view != NULL);
 
   // record that we're unblocked
@@ -634,7 +612,7 @@ static void unblock(detector_t* d, pony_actor_t* actor)
   // remove from the deferred set
   if(view->deferred)
   {
-    ponyint_viewmap_remove(&d->deferred, view);
+    ponyint_viewmap_remove(&d->deferred, (uintptr_t)view->actor);
     view->deferred = false;
   }
 
@@ -644,11 +622,9 @@ static void unblock(detector_t* d, pony_actor_t* actor)
 
 static void ack(pony_ctx_t* ctx, detector_t* d, size_t token)
 {
-  perceived_t key;
-  key.token = token;
-  size_t index = HASHMAP_UNKNOWN;
+  size_t index = RT_HASHMAP_UNKNOWN;
 
-  perceived_t* per = ponyint_perceivedmap_get(&d->perceived, &key, &index);
+  perceived_t* per = ponyint_perceivedmap_get(&d->perceived, (uintptr_t)token, &index);
 
   if(per == NULL)
     return;
@@ -688,7 +664,7 @@ static void final(pony_ctx_t* ctx, pony_actor_t* self)
   }
 
   detector_t* d = (detector_t*)self;
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   view_t* view;
 
   // Invoke the actor's finalizer. Note that system actors and unscheduled
@@ -714,10 +690,10 @@ static void dump_view(view_t* view)
     view->rc == view->actor->gc.rc ? "" : " ERROR",
     view->actor->gc.delta == NULL ? "" : " DELTA");
 
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   viewref_t* p;
   actorref_t* aref;
-  size_t index = HASHMAP_UNKNOWN;
+  size_t index = RT_HASHMAP_UNKNOWN;
 
   while((p = ponyint_viewrefmap_next(&view->map, &i)) != NULL)
   {
@@ -738,7 +714,7 @@ static void dump_view(view_t* view)
   {
     printf("\t--- ERROR\n");
 
-    i = HASHMAP_BEGIN;
+    i = RT_HASHMAP_BEGIN;
 
     while((aref = ponyint_actormap_next(&view->actor->gc.foreign, &i)) != NULL)
     {
@@ -750,7 +726,7 @@ static void dump_view(view_t* view)
 static void dump_views()
 {
   detector_t* d = (detector_t*)cycle_detector;
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   view_t* view;
 
   while((view = ponyint_viewmap_next(&d->views, &i)) != NULL)
@@ -778,7 +754,7 @@ static void check_view(detector_t* d, view_t* view)
 static void check_views()
 {
   detector_t* d = (detector_t*)cycle_detector;
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   view_t* view;
 
   while((view = ponyint_viewmap_next(&d->views, &i)) != NULL)

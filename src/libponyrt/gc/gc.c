@@ -154,7 +154,7 @@ static void recv_local_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
   int mutability)
 {
   // get the object
-  size_t index = HASHMAP_UNKNOWN;
+  size_t index = RT_HASHMAP_UNKNOWN;
   gc_t* gc = ponyint_actor_gc(ctx->current);
   object_t* obj = ponyint_objectmap_getobject(&gc->local, p, &index);
   assert(obj != NULL);
@@ -222,7 +222,7 @@ static void acquire_local_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
 static void release_local_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
   int mutability)
 {
-  size_t index = HASHMAP_UNKNOWN;
+  size_t index = RT_HASHMAP_UNKNOWN;
   gc_t* gc = ponyint_actor_gc(ctx->current);
   object_t* obj = ponyint_objectmap_getobject(&gc->local, p, &index);
   assert(obj != NULL);
@@ -573,7 +573,7 @@ void ponyint_gc_createactor(pony_actor_t* current, pony_actor_t* actor)
 void ponyint_gc_markimmutable(pony_ctx_t* ctx, gc_t* gc)
 {
   objectmap_t* map = &gc->local;
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   object_t* obj;
 
   while((obj = ponyint_objectmap_next(map, &i)) != NULL)
@@ -626,7 +626,7 @@ bool ponyint_gc_acquire(gc_t* gc, actorref_t* aref)
   gc->rc += rc;
 
   objectmap_t* map = &aref->map;
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   object_t* obj;
 
   while((obj = ponyint_objectmap_next(map, &i)) != NULL)
@@ -653,9 +653,9 @@ bool ponyint_gc_release(gc_t* gc, actorref_t* aref)
   gc->rc -= rc;
 
   objectmap_t* map = &aref->map;
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   object_t* obj;
-  size_t index = HASHMAP_UNKNOWN;
+  size_t index = RT_HASHMAP_UNKNOWN;
 
   while((obj = ponyint_objectmap_next(map, &i)) != NULL)
   {
@@ -684,7 +684,7 @@ deltamap_t* ponyint_gc_delta(gc_t* gc)
 
 void ponyint_gc_sendacquire(pony_ctx_t* ctx)
 {
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   actorref_t* aref;
 
   while((aref = ponyint_actormap_next(&ctx->acquire, &i)) != NULL)
@@ -704,7 +704,7 @@ void ponyint_gc_sendrelease(pony_ctx_t* ctx, gc_t* gc)
 
 void ponyint_gc_sendrelease_manual(pony_ctx_t* ctx)
 {
-  size_t i = HASHMAP_BEGIN;
+  size_t i = RT_HASHMAP_BEGIN;
   actorref_t* aref;
 
   while((aref = ponyint_actormap_next(&ctx->acquire, &i)) != NULL)
