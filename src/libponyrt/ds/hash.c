@@ -35,7 +35,7 @@ static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
       else
         *pos = index;
 
-      if(map->count > 4000)
+      if(map->count > 2048)
       {
         DTRACE3(HASH_FAIL, (uintptr_t)map->buckets, map->count, num_probes);
       }
@@ -45,7 +45,7 @@ static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
       if(index_del > mask)
         index_del = index;
     } else if(cmp(key, elem)) {
-      if(map->count > 4000)
+      if(map->count > 2048)
       {
         DTRACE3(HASH_SUCCESS, (uintptr_t)map->buckets, map->count, num_probes);
       }
@@ -54,13 +54,13 @@ static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
     }
 
     index = (h + ((i + (i * i)) >> 1)) & mask;
-    if(map->count > 4000)
+    if(map->count > 2048)
     {
       DTRACE1(HASH_COLLISION, (uintptr_t)map->buckets);
     }
   }
 
-  if(map->count > 4000)
+  if(map->count > 2048)
   {
     DTRACE3(HASH_FAIL, (uintptr_t)map->buckets, map->count, num_probes);
   }
@@ -89,7 +89,7 @@ static void resize(hashmap_t* map, hash_fn hash, cmp_fn cmp, alloc_fn alloc,
       ponyint_hashmap_put(map, curr, hash, cmp, alloc, fr);
   }
 
-  if(map->count > 4000)
+  if(map->count > 2048)
   {
     DTRACE2(HASH_RESIZE, (uintptr_t)b, (uintptr_t)map->buckets);
   }

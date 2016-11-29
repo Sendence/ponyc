@@ -24,8 +24,8 @@ probe process.mark("hash-fail")
 
 probe process.mark("hash-resize")
 {   
-    hashmap[$arg1, "resize"] = $arg2;
-    hashmap_list[$arg1] ++;
+    hashmap[$arg2, "resize"] = $arg1;
+    hashmap_list[$arg2] ++;
 }
 
 probe end
