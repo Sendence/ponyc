@@ -117,7 +117,7 @@ static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
   if(!ponyint_heap_startgc(&actor->heap))
     return;
 
-  DTRACE3(GC_START, (uintptr_t)ctx->scheduler, (uintptr_t)actor, actor->heap.used);
+  DTRACE4(GC_START, (uintptr_t)ctx->scheduler, (uintptr_t)actor, actor->heap.used, actor->heap.foreign_used);
 
   ponyint_gc_mark(ctx);
 
@@ -127,7 +127,7 @@ static void try_gc(pony_ctx_t* ctx, pony_actor_t* actor)
   ponyint_mark_done(ctx);
   ponyint_heap_endgc(&actor->heap);
 
-  DTRACE3(GC_END, (uintptr_t)ctx->scheduler, (uintptr_t)actor, actor->heap.used);
+  DTRACE4(GC_END, (uintptr_t)ctx->scheduler, (uintptr_t)actor, actor->heap.used, actor->heap.foreign_used);
 }
 
 bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)

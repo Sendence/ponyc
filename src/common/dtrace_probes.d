@@ -60,7 +60,7 @@ provider pony {
   /**
    * Fired when the garbage collection function is ending
    */
-  probe gc__end(uintptr_t scheduler, uintptr_t actor, unsigned long heap_size);
+  probe gc__end(uintptr_t scheduler, uintptr_t actor, unsigned long heap_size, unsigned long heap_foreign_size);
 
   /**
    * Fired when the garbage collector finishes sending an object
@@ -85,7 +85,7 @@ provider pony {
   /**
    * Fired when the garbage collection function has started
    */
-  probe gc__start(uintptr_t scheduler, uintptr_t actor, unsigned long heap_size);
+  probe gc__start(uintptr_t scheduler, uintptr_t actor, unsigned long heap_size, unsigned long heap_foreign_size);
 
   /**
    * Fired when the garbage collection threshold is changed with a certain factor

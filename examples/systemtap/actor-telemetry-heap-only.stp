@@ -3,11 +3,17 @@ global actor_gc_passes, time_in_gc, alloc
 probe process.mark("gc-start")
 {
     time_in_gc[$arg2, "heapsize"] = $arg3
+    time_in_gc[$arg2, "foreign_heapsize"] = $arg4
 }
 
 probe process.mark("gc-end")
 {
     time_in_gc[$arg2, "heapsize"] = $arg3
+    time_in_gc[$arg2, "foreign_heapsize"] = $arg4
+    if(time_in_gc[$arg2, "initial_foreign_heapsize"] == 0)
+      time_in_gc[$arg2, "initial_foreign_heapsize"] = $arg4
+    if(time_in_gc[$arg2, "initial_heapsize"] == 0)
+      time_in_gc[$arg2, "initial_heapsize"] = $arg3
 }
 
 probe process.mark("heap-alloc")
@@ -30,6 +36,11 @@ probe end
       printf("    \"type_id\": %d,\n", alloc[actor, "type_id"]);
       printf("    \"last_alloc_heapsize\": %d,\n", alloc[actor, "heapsize"]);
       printf("    \"last_gc_heapsize\": %d,\n", time_in_gc[actor, "heapsize"]);
+      printf("    \"last_gc_local_heapsize\": %d,\n", time_in_gc[actor, "heapsize"] - time_in_gc[actor, "foreign_heapsize"]);
+      printf("    \"last_gc_foreign_heapsize\": %d,\n", time_in_gc[actor, "foreign_heapsize"]);
+      printf("    \"initial_gc_heapsize\": %d,\n", time_in_gc[actor, "initial_heapsize"]);
+      printf("    \"initial_gc_local_heapsize\": %d,\n", time_in_gc[actor, "initial_heapsize"] - time_in_gc[actor, "initial_foreign_heapsize"]);
+      printf("    \"initial_gc_foreign_heapsize\": %d,\n", time_in_gc[actor, "initial_foreign_heapsize"]);
       printf("  },\n");
     }
     printf("]\n");
