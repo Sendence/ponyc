@@ -483,10 +483,11 @@ void ponyint_heap_endgc(heap_t* heap)
   // usage has increased.
   heap->used += used;
   size_t baseline = heap->baseline;
-  if (baseline == 0)
+  if (baseline == 0) {
     heap->baseline = heap->used;
-
-  heap->next_gc = (size_t)((double)(heap->used - baseline) * heap_nextgc_factor);
+  } else {
+    heap->next_gc = (size_t)((double)(heap->used - baseline) * heap_nextgc_factor);
+  }
 
   if(heap->next_gc < heap_initialgc)
     heap->next_gc = heap_initialgc;
