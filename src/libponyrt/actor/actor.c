@@ -417,3 +417,10 @@ void pony_poll(pony_ctx_t* ctx)
   assert(ctx->current != NULL);
   ponyint_actor_run(ctx, ctx->current, 1);
 }
+
+void pony_batch_size(pony_actor_t* actor, size_t batch)
+{
+  if (batch > 0)
+    actor->batch = batch;
+}
+
