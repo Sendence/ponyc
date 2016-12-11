@@ -60,12 +60,17 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
   size_t s = map->size;
 //  size_t c = map->count;
   rt_hashmap_entry_t* b = map->buckets;
+  bitmap_t* old_item_bitmap = map->item_bitmap;
 
   map->count = 0;
   map->deleted_count = 0;
   map->size = (s < MIN_RT_HASHMAP_SIZE) ? MIN_RT_HASHMAP_SIZE : s << 3;
   map->buckets = (rt_hashmap_entry_t*)alloc(map->size * sizeof(rt_hashmap_entry_t));
   memset(map->buckets, 0, map->size * sizeof(rt_hashmap_entry_t));
+
+  size_t bitmap_size = map->size/RT_HASHMAP_BITMAP_TYPE_SIZE + (map->size%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
+  map->item_bitmap = (bitmap_t*)alloc(bitmap_size * sizeof(bitmap_t));
+  memset(map->item_bitmap, 0, bitmap_size * sizeof(bitmap_t));
 
   for(size_t i = 0; i < s; i++)
   {
@@ -74,7 +79,11 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
   }
 
   if((fr != NULL) && (b != NULL))
+  {
     fr(s * sizeof(rt_hashmap_entry_t), b);
+    size_t old_bitmap_size = s/RT_HASHMAP_BITMAP_TYPE_SIZE + (s%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
+    fr(old_bitmap_size * sizeof(bitmap_t), old_item_bitmap);
+  }
 
 //  printf("resized.. old size: %lu, old count: %lu, new size: %lu, new count: %lu\n", s, c, map->size, map->count);
 }
@@ -89,11 +98,15 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
     return;
 
   rt_hashmap_entry_t* b = map->buckets;
+  bitmap_t* old_item_bitmap = map->item_bitmap;
 
   map->count = 0;
   map->deleted_count = 0;
   map->buckets = (rt_hashmap_entry_t*)alloc(map->size * sizeof(rt_hashmap_entry_t));
   memset(map->buckets, 0, map->size * sizeof(rt_hashmap_entry_t));
+  size_t bitmap_size = map->size/RT_HASHMAP_BITMAP_TYPE_SIZE + (map->size%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
+  map->item_bitmap = (bitmap_t*)alloc(bitmap_size * sizeof(bitmap_t));
+  memset(map->item_bitmap, 0, bitmap_size * sizeof(bitmap_t));
 
   for(size_t i = 0; i < map->size; i++)
   {
@@ -102,7 +115,10 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
   }
 
   if((fr != NULL) && (b != NULL))
+  {
     fr(map->size * sizeof(rt_hashmap_entry_t), b);
+    fr(bitmap_size * sizeof(bitmap_t), old_item_bitmap);
+  }
 }
 
 void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)
@@ -126,8 +142,13 @@ void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)
   {
     map->buckets = (rt_hashmap_entry_t*)alloc(size * sizeof(rt_hashmap_entry_t));
     memset(map->buckets, 0, size * sizeof(rt_hashmap_entry_t));
+    size_t bitmap_size = size/RT_HASHMAP_BITMAP_TYPE_SIZE + (size%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
+    map->item_bitmap = (bitmap_t*)alloc(bitmap_size * sizeof(bitmap_t));
+    memset(map->item_bitmap, 0, bitmap_size * sizeof(bitmap_t));
+
   } else {
     map->buckets = NULL;
+    map->item_bitmap = NULL;
   }
 }
 
@@ -143,12 +164,17 @@ void ponyint_rt_hashmap_destroy(rt_hashmap_t* map, free_size_fn fr, free_fn free
   }
 
   if((fr != NULL) && (map->size > 0))
+  {
     fr(map->size * sizeof(rt_hashmap_entry_t), map->buckets);
+    size_t bitmap_size = map->size/RT_HASHMAP_BITMAP_TYPE_SIZE + (map->size%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
+    fr(bitmap_size * sizeof(bitmap_t), map->item_bitmap);
+  }
 
   map->count = 0;
   map->deleted_count = 0;
   map->size = 0;
   map->buckets = NULL;
+  map->item_bitmap = NULL;
 }
 
 void* ponyint_rt_hashmap_get(rt_hashmap_t* map, uintptr_t key, rt_hash_fn hash, size_t* pos)
@@ -174,6 +200,12 @@ void* ponyint_rt_hashmap_put(rt_hashmap_t* map, void* entry, uintptr_t key, rt_h
   if(elem == NULL)
   {
     map->count++;
+
+    // update item bitmap
+    size_t ib_index = pos/RT_HASHMAP_BITMAP_TYPE_SIZE;
+    size_t ib_offset = pos%RT_HASHMAP_BITMAP_TYPE_SIZE;
+    map->item_bitmap[ib_index] |= ((bitmap_t)1 << ib_offset);
+
 //    printf("successfully put new element bucket: %lu, elem %lu, pos: %lu\n", (uintptr_t)map->buckets, (uintptr_t)pos_entry, pos);
 //    printf("requested ptr: %lu, data: %lu\n", (uintptr_t)(entry), key);
 //    printf("actual ptr: %lu, data: %lu\n", (uintptr_t)(pos_entry->ptr), pos_entry->data);
@@ -205,6 +237,11 @@ void* ponyint_rt_hashmap_putindex(rt_hashmap_t* map, void* entry, uintptr_t key,
   {
     map->count++;
 
+    // update item bitmap
+    size_t ib_index = pos/RT_HASHMAP_BITMAP_TYPE_SIZE;
+    size_t ib_offset = pos%RT_HASHMAP_BITMAP_TYPE_SIZE;
+    map->item_bitmap[ib_index] |= ((bitmap_t)1 << ib_offset);
+
     if((map->count << 1) > map->size)
       resize(map, hash, alloc, fr);
 
@@ -227,6 +264,11 @@ void* ponyint_rt_hashmap_remove(rt_hashmap_t* map, uintptr_t key, rt_hash_fn has
     map->buckets[pos].ptr = DELETED;
     map->deleted_count++;
     map->count--;
+
+    // update item bitmap
+    size_t ib_index = pos/RT_HASHMAP_BITMAP_TYPE_SIZE;
+    size_t ib_offset = pos%RT_HASHMAP_BITMAP_TYPE_SIZE;
+    map->item_bitmap[ib_index] &= ~((bitmap_t)1 << ib_offset);
   }
 
   return elem;
@@ -245,6 +287,12 @@ void* ponyint_rt_hashmap_removeindex(rt_hashmap_t* map, size_t index)
   map->buckets[index].ptr = DELETED;
   map->deleted_count++;
   map->count--;
+
+  // update item bitmap
+  size_t ib_index = index/RT_HASHMAP_BITMAP_TYPE_SIZE;
+  size_t ib_offset = index%RT_HASHMAP_BITMAP_TYPE_SIZE;
+  map->item_bitmap[ib_index] &= ~((bitmap_t)1 << ib_offset);
+
   return elem;
 }
 
@@ -255,21 +303,63 @@ void* ponyint_rt_hashmap_next(rt_hashmap_t* map, size_t* i)
 
   void* elem = NULL;
   size_t index = *i + 1;
+  size_t ib_index = 0;
+  size_t ib_offset = 0;
 
   while(index < map->size)
   {
-    elem = map->buckets[index].ptr;
+    ib_index = index/RT_HASHMAP_BITMAP_TYPE_SIZE;
+    ib_offset = index%RT_HASHMAP_BITMAP_TYPE_SIZE;
 
-    if(valid(elem))
+    // if we're at the beginning of a new array entry in the item bitmap
+    if(ib_offset == 0)
     {
-      *i = index;
-      return elem;
-    }
+      // find first set bit using ffs
+#ifdef PLATFORM_IS_ILP32
+      ib_offset = __pony_ffs(map->item_bitmap[ib_index]);
+#else
+      ib_offset = __pony_ffsl(map->item_bitmap[ib_index]);
+#endif
 
-    index++;
+      // if no bits set; increment by size of item bitmap type and continue
+      if(ib_offset == 0)
+      {
+        index += RT_HASHMAP_BITMAP_TYPE_SIZE;
+        continue;
+      } else {
+        // found a set bit for valid element
+        index += (ib_offset - 1);
+        elem = map->buckets[index].ptr;
+
+        // no need to check if valid element because item bitmap keeps track of that
+        *i = index;
+        return elem;
+      }
+    } else {
+
+      // in the middle of an item bitmap array entry (can't use ffs optimization
+      // to find first valid element in bitmap araay entry)
+      do
+        if((map->item_bitmap[ib_index] & ((bitmap_t)1 << ib_offset)) != 0)
+        {
+          // found an element
+          elem = map->buckets[index].ptr;
+
+          // no need to check if valid element because item bitmap keeps track of that
+          *i = index;
+          return elem;
+        } else {
+          index++;
+          ib_offset++;
+        }
+      while(ib_offset < RT_HASHMAP_BITMAP_TYPE_SIZE);
+    }
   }
 
-  *i = index;
+  // searched through bitmap and didn't find any more valid elements.
+  // due to ffs index can be greater than size so set i to size instead
+  // to preserve old behavior
+  *i = map->size;
   return NULL;
 }
 

@@ -13,6 +13,14 @@ PONY_EXTERN_C_BEGIN
 #define RT_HASHMAP_BEGIN ((size_t)-1)
 #define RT_HASHMAP_UNKNOWN ((size_t)-1)
 
+#ifdef PLATFORM_IS_ILP32
+  typedef uint32_t bitmap_t;
+  #define RT_HASHMAP_BITMAP_TYPE_SIZE 32
+#else
+  typedef uint64_t bitmap_t;
+  #define RT_HASHMAP_BITMAP_TYPE_SIZE 64
+#endif
+
 /** Definition of a hash map entry for uintptr_t.
  */
 typedef struct rt_hashmap_entry_t
@@ -30,6 +38,7 @@ typedef struct rt_hashmap_t
   size_t count;   /* number of elements in the map */
   size_t size;    /* size of the buckets array */
   size_t deleted_count;   /* number of deleted elements in the map */
+  bitmap_t* item_bitmap;
   rt_hashmap_entry_t* buckets;
 } rt_hashmap_t;
 
