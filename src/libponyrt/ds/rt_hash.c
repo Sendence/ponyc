@@ -6,6 +6,15 @@
 
 #define DELETED ((void*)1)
 
+// Minimum RT_HASHMAP size allowed
+#define MIN_RT_HASHMAP_SIZE 8
+
+// Mazimum percent of deleted entries compared to valid entries allowed before optimization
+#define MAX_RT_HASHMAP_DELETED_PCT 0.25
+
+// Minimum RT_HASHMAP size for hashmap before optimization is considered
+#define MIN_RT_HASHMAP_OPTIMIZE_SIZE 2048
+
 static bool valid(void* entry)
 {
   return ((uintptr_t)entry) > ((uintptr_t)DELETED);
@@ -53,7 +62,8 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
   rt_hashmap_entry_t* b = map->buckets;
 
   map->count = 0;
-  map->size = (s < 8) ? 8 : s << 3;
+  map->deleted_count = 0;
+  map->size = (s < MIN_RT_HASHMAP_SIZE) ? MIN_RT_HASHMAP_SIZE : s << 3;
   map->buckets = (rt_hashmap_entry_t*)alloc(map->size * sizeof(rt_hashmap_entry_t));
   memset(map->buckets, 0, map->size * sizeof(rt_hashmap_entry_t));
 
@@ -69,6 +79,32 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
 //  printf("resized.. old size: %lu, old count: %lu, new size: %lu, new count: %lu\n", s, c, map->size, map->count);
 }
 
+void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
+  free_size_fn fr)
+{
+  // Don't optimize if the hashmap is too small or if the # deleted items is not large enough
+  // TODO: figure out right heuristic for when to optimize
+  if((map->size < MIN_RT_HASHMAP_OPTIMIZE_SIZE) ||
+    (((float)map->deleted_count)/((float)map->count) < MAX_RT_HASHMAP_DELETED_PCT))
+    return;
+
+  rt_hashmap_entry_t* b = map->buckets;
+
+  map->count = 0;
+  map->deleted_count = 0;
+  map->buckets = (rt_hashmap_entry_t*)alloc(map->size * sizeof(rt_hashmap_entry_t));
+  memset(map->buckets, 0, map->size * sizeof(rt_hashmap_entry_t));
+
+  for(size_t i = 0; i < map->size; i++)
+  {
+    if(valid(b[i].ptr))
+      ponyint_rt_hashmap_put(map, b[i].ptr, b[i].data, hash, alloc, fr);
+  }
+
+  if((fr != NULL) && (b != NULL))
+    fr(map->size * sizeof(rt_hashmap_entry_t), b);
+}
+
 void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)
 {
   if(size > 0)
@@ -76,13 +112,14 @@ void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)
     // make sure we have room for this many elements without resizing
     size <<= 1;
 
-    if(size < 8)
-      size = 8;
+    if(size < MIN_RT_HASHMAP_SIZE)
+      size = MIN_RT_HASHMAP_SIZE;
     else
       size = ponyint_next_pow2(size);
   }
 
   map->count = 0;
+  map->deleted_count = 0;
   map->size = size;
 
   if(size > 0)
@@ -109,6 +146,7 @@ void ponyint_rt_hashmap_destroy(rt_hashmap_t* map, free_size_fn fr, free_fn free
     fr(map->size * sizeof(rt_hashmap_entry_t), map->buckets);
 
   map->count = 0;
+  map->deleted_count = 0;
   map->size = 0;
   map->buckets = NULL;
 }
@@ -187,6 +225,7 @@ void* ponyint_rt_hashmap_remove(rt_hashmap_t* map, uintptr_t key, rt_hash_fn has
   if(elem != NULL)
   {
     map->buckets[pos].ptr = DELETED;
+    map->deleted_count++;
     map->count--;
   }
 
@@ -204,6 +243,7 @@ void* ponyint_rt_hashmap_removeindex(rt_hashmap_t* map, size_t index)
     return NULL;
 
   map->buckets[index].ptr = DELETED;
+  map->deleted_count++;
   map->count--;
   return elem;
 }

@@ -29,6 +29,7 @@ typedef struct rt_hashmap_t
 {
   size_t count;   /* number of elements in the map */
   size_t size;    /* size of the buckets array */
+  size_t deleted_count;   /* number of deleted elements in the map */
   rt_hashmap_entry_t* buckets;
 } rt_hashmap_t;
 
@@ -43,6 +44,12 @@ void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc);
  */
 void ponyint_rt_hashmap_destroy(rt_hashmap_t* map, free_size_fn fr,
   free_fn free_elem);
+
+/** Optimizes a hash map to remove deleted entries if they are more than a set percentage.
+ *  to keep probe count per search attempt reasonable.
+ */
+void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
+  free_size_fn fr);
 
 /** Retrieve an element from a hash map.
  *
@@ -93,6 +100,7 @@ void* ponyint_rt_hashmap_next(rt_hashmap_t* map, size_t* i);
   typedef struct name_t { rt_hashmap_t contents; } name_t; \
   void name##_init(name_t* map, size_t size); \
   void name##_destroy(name_t* map); \
+  void name##_optimize(name_t* map); \
   type* name##_get(name_t* map, uintptr_t key, size_t* index); \
   type* name##_put(name_t* map, type* entry, uintptr_t key); \
   type* name##_putindex(name_t* map, type* entry, uintptr_t key, size_t index); \
@@ -117,6 +125,12 @@ void* ponyint_rt_hashmap_next(rt_hashmap_t* map, size_t* i);
   { \
     name##_free_fn freef = free_elem; \
     ponyint_rt_hashmap_destroy((rt_hashmap_t*)map, fr, (free_fn)freef); \
+  } \
+  void name##_optimize(name_t* map) \
+  { \
+    alloc_fn allocf = alloc; \
+    name##_hash_fn hashf = hash; \
+    ponyint_rt_hashmap_optimize((rt_hashmap_t*)map, (rt_hash_fn)hashf, allocf, fr); \
   } \
   type* name##_get(name_t* map, uintptr_t key, size_t* index) \
   { \

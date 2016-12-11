@@ -74,6 +74,9 @@ static actorref_t* move_unmarked_objects(actorref_t* from, uint32_t mark)
     ponyint_objectmap_put(&to->map, obj, (uintptr_t)obj->address);
   }
 
+  // optimize map if too many deleted entries
+  ponyint_objectmap_optimize(&from->map);
+
   return to;
 }
 
@@ -130,6 +133,9 @@ deltamap_t* ponyint_actormap_sweep(pony_ctx_t* ctx, actormap_t* map,
 
     send_release(ctx, aref);
   }
+
+  // optimize map if too many deleted entries
+  ponyint_actormap_optimize(map);
 
   return delta;
 }

@@ -104,5 +104,8 @@ size_t ponyint_objectmap_sweep(objectmap_t* map)
     }
   }
 
+  // optimize map if too many deleted entries
+  ponyint_objectmap_optimize(map);
+
   return count;
 }
