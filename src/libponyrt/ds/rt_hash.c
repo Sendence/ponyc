@@ -9,8 +9,13 @@
 // Minimum RT_HASHMAP size allowed
 #define MIN_RT_HASHMAP_SIZE 8
 
-// Mazimum percent of deleted entries compared to valid entries allowed before optimization
-#define MAX_RT_HASHMAP_DELETED_PCT 0.25
+// Maximum percent of deleted entries compared to valid entries allowed before optimization
+// The shift value is the multiplier before a comparison is done against the count
+// A shift of 2 effectively equals a maximum percentage of 25%
+// A shift of 1 effectively equals a maximum percentage of 50%
+// A shift of 0 effectively equals a maximum percentage of 100%
+// NOTE: A shift is used to avoid floating point math as a performance optimization
+#define MAX_RT_HASHMAP_DELETED_SHIFT 2
 
 // Minimum RT_HASHMAP size for hashmap before optimization is considered
 #define MIN_RT_HASHMAP_OPTIMIZE_SIZE 2048
@@ -93,32 +98,57 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
 {
   // Don't optimize if the hashmap is too small or if the # deleted items is not large enough
   // TODO: figure out right heuristic for when to optimize
+  // TODO: The objectmap is likely to reach steady state where optimize isn't actually moving
+  //       any items. Need a way to identify that and not run optimize as often in that case
+  //       to not pay the penalty of hashing the keys all the time
+  // TODO: For RT_HASHMAP, maybe consider not using a hash function at all but just do a mask
+  //       on the memory addresses themselves? Need to run a probe distribution test to confirm
+  //       if it would result in too many collisions or not
+  // TODO: Maybe consider doing optimize work as part of `sweep` to avoid a second memory access
+  //       of the same hashmap memory?
   if((map->size < MIN_RT_HASHMAP_OPTIMIZE_SIZE) ||
-    (((float)map->deleted_count)/((float)map->count) < MAX_RT_HASHMAP_DELETED_PCT))
+    ((map->deleted_count << MAX_RT_HASHMAP_DELETED_SHIFT) < (map->count)))
     return;
 
-  rt_hashmap_entry_t* b = map->buckets;
-  bitmap_t* old_item_bitmap = map->item_bitmap;
+  size_t old_index = RT_HASHMAP_BEGIN;
+  void* entry = NULL;
+  uintptr_t key = 0;
 
-  map->count = 0;
+  size_t mask = map->size - 1;
+
+  size_t h = 0;
+  size_t index = 0;
+
+  // find element in the array
+  while((entry = ponyint_rt_hashmap_next(map, &old_index)) != NULL)
+  {
+    // get key and calculate hash
+    key = map->buckets[old_index].data;
+    h = hash(key);
+    index = h & mask;
+
+    for(size_t i = 0; i <= mask; i++)
+    {
+      // if next bucket index is current position, item is already in optimal spot
+      if(index == old_index)
+        break;
+
+      // found an earlier deleted bucket so move item
+      if(map->buckets[index].ptr == DELETED) {
+        ponyint_rt_hashmap_removeindex(map, old_index);
+        ponyint_rt_hashmap_putindex(map, entry, key, hash, alloc, fr, index);
+        break;
+      }
+
+      // find next bucket index
+      index = (h + ((i + (i * i)) >> 1)) & mask;
+    }
+  }
+
+  // reset deleted count to 0 since we only care about new deletions since the last optimize
+  // this is because the deleted elements will accumulate in the hashmap as time goes on
+  // and entries are added and removed
   map->deleted_count = 0;
-  map->buckets = (rt_hashmap_entry_t*)alloc(map->size * sizeof(rt_hashmap_entry_t));
-  memset(map->buckets, 0, map->size * sizeof(rt_hashmap_entry_t));
-  size_t bitmap_size = map->size/RT_HASHMAP_BITMAP_TYPE_SIZE + (map->size%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
-  map->item_bitmap = (bitmap_t*)alloc(bitmap_size * sizeof(bitmap_t));
-  memset(map->item_bitmap, 0, bitmap_size * sizeof(bitmap_t));
-
-  for(size_t i = 0; i < map->size; i++)
-  {
-    if(valid(b[i].ptr))
-      ponyint_rt_hashmap_put(map, b[i].ptr, b[i].data, hash, alloc, fr);
-  }
-
-  if((fr != NULL) && (b != NULL))
-  {
-    fr(map->size * sizeof(rt_hashmap_entry_t), b);
-    fr(bitmap_size * sizeof(bitmap_t), old_item_bitmap);
-  }
 }
 
 void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)
@@ -199,6 +229,7 @@ void* ponyint_rt_hashmap_put(rt_hashmap_t* map, void* entry, uintptr_t key, rt_h
 
   if(elem == NULL)
   {
+    // NOTE: We intentionally don't decrement deleted_count due to it being reset if the hashmap gets optimized
     map->count++;
 
     // update item bitmap
@@ -235,6 +266,7 @@ void* ponyint_rt_hashmap_putindex(rt_hashmap_t* map, void* entry, uintptr_t key,
 
   if(elem == DELETED || elem == 0)
   {
+    // NOTE: We intentionally don't decrement deleted_count due to it being reset if the hashmap gets optimized
     map->count++;
 
     // update item bitmap
@@ -339,7 +371,7 @@ void* ponyint_rt_hashmap_next(rt_hashmap_t* map, size_t* i)
 
       // in the middle of an item bitmap array entry (can't use ffs optimization
       // to find first valid element in bitmap araay entry)
-      do
+      do {
         if((map->item_bitmap[ib_index] & ((bitmap_t)1 << ib_offset)) != 0)
         {
           // found an element
@@ -352,7 +384,7 @@ void* ponyint_rt_hashmap_next(rt_hashmap_t* map, size_t* i)
           index++;
           ib_offset++;
         }
-      while(ib_offset < RT_HASHMAP_BITMAP_TYPE_SIZE);
+      } while(ib_offset < RT_HASHMAP_BITMAP_TYPE_SIZE);
     }
   }
 
