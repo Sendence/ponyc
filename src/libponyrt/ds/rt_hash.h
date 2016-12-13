@@ -38,7 +38,8 @@ typedef struct rt_hashmap_t
   size_t count;   /* number of elements in the map */
   size_t size;    /* size of the buckets array */
   size_t deleted_count;   /* number of deleted elements in the map */
-  bitmap_t* item_bitmap;
+  ssize_t optimize_deleted_shift;   /* shift amount for when to run optimize */
+  bitmap_t* item_bitmap;   /* Item bitarray to keep track items for optimized scanning */
   rt_hashmap_entry_t* buckets;
 } rt_hashmap_t;
 

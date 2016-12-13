@@ -9,13 +9,32 @@
 // Minimum RT_HASHMAP size allowed
 #define MIN_RT_HASHMAP_SIZE 8
 
-// Maximum percent of deleted entries compared to valid entries allowed before optimization
+// Maximum percent of deleted entries compared to valid entries allowed before initial optimization
 // The shift value is the multiplier before a comparison is done against the count
+// Positive == left shift; negative == right shift
 // A shift of 2 effectively equals a maximum percentage of 25%
 // A shift of 1 effectively equals a maximum percentage of 50%
 // A shift of 0 effectively equals a maximum percentage of 100%
+// A shift of -1 effectively equals a maximum percentage of 200%
+// A shift of -2 effectively equals a maximum percentage of 400%
+// A shift of -3 effectively equals a maximum percentage of 800%
+// A shift of -4 effectively equals a maximum percentage of 1600%
 // NOTE: A shift is used to avoid floating point math as a performance optimization
-#define MAX_RT_HASHMAP_DELETED_SHIFT 2
+#define MAX_RT_HASHMAP_DELETED_SHIFT_INITIAL 2
+
+// Minimum percent of entries optimized compared to valid entries by an optimize before
+// or else we back off on how often we optimize by modulating the MAX_RT_HASHMAP_DELETED_SHIFT_INITIAL
+// shift
+// The shift value is the multiplier before a comparison is done against the count
+// A shift of 6 effectively equals a minimum percentage of 1.5625%
+// A shift of 5 effectively equals a minimum percentage of 3.125%
+// A shift of 4 effectively equals a minimum percentage of 6.25%
+// A shift of 3 effectively equals a minimum percentage of 12.5%
+// A shift of 2 effectively equals a minimum percentage of 25%
+// A shift of 1 effectively equals a minimum percentage of 50%
+// A shift of 0 effectively equals a minimum percentage of 100%
+// NOTE: A shift is used to avoid floating point math as a performance optimization
+#define MIN_RT_HASHMAP_OPTIMIZATION_SHIFT 4
 
 // Minimum RT_HASHMAP size for hashmap before optimization is considered
 #define MIN_RT_HASHMAP_OPTIMIZE_SIZE 2048
@@ -33,7 +52,7 @@ static void* search(rt_hashmap_t* map, size_t* pos, uintptr_t key, rt_hash_fn ha
   size_t h = hash(key);
   size_t index = h & mask;
 
-  for(size_t i = 0; i <= mask; i++)
+  for(size_t i = 1; i <= mask; i++)
   {
     if(map->buckets[index].ptr == NULL)
     {
@@ -69,6 +88,7 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
 
   map->count = 0;
   map->deleted_count = 0;
+  map->optimize_deleted_shift = MAX_RT_HASHMAP_DELETED_SHIFT_INITIAL;
   map->size = (s < MIN_RT_HASHMAP_SIZE) ? MIN_RT_HASHMAP_SIZE : s << 3;
   map->buckets = (rt_hashmap_entry_t*)alloc(map->size * sizeof(rt_hashmap_entry_t));
   memset(map->buckets, 0, map->size * sizeof(rt_hashmap_entry_t));
@@ -107,7 +127,10 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
   // TODO: Maybe consider doing optimize work as part of `sweep` to avoid a second memory access
   //       of the same hashmap memory?
   if((map->size < MIN_RT_HASHMAP_OPTIMIZE_SIZE) ||
-    ((map->deleted_count << MAX_RT_HASHMAP_DELETED_SHIFT) < (map->count)))
+    (((map->deleted_count << 1) < map->size) &&
+    (((map->optimize_deleted_shift >= 0) ?
+       map->deleted_count << map->optimize_deleted_shift :
+       map->deleted_count >> map->optimize_deleted_shift) < (map->count))))
     return;
 
   size_t old_index = RT_HASHMAP_BEGIN;
@@ -119,6 +142,8 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
   size_t h = 0;
   size_t index = 0;
 
+  size_t num_optimized = 0;
+
   // find element in the array
   while((entry = ponyint_rt_hashmap_next(map, &old_index)) != NULL)
   {
@@ -127,7 +152,7 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
     h = hash(key);
     index = h & mask;
 
-    for(size_t i = 0; i <= mask; i++)
+    for(size_t i = 1; i <= mask; i++)
     {
       // if next bucket index is current position, item is already in optimal spot
       if(index == old_index)
@@ -137,6 +162,7 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
       if(map->buckets[index].ptr == DELETED) {
         ponyint_rt_hashmap_removeindex(map, old_index);
         ponyint_rt_hashmap_putindex(map, entry, key, hash, alloc, fr, index);
+        num_optimized++;
         break;
       }
 
@@ -149,6 +175,15 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
   // this is because the deleted elements will accumulate in the hashmap as time goes on
   // and entries are added and removed
   map->deleted_count = 0;
+
+  // back off on when next optimize will occur because we didn't optimize enough entries
+  // during this optimize run to avoid wasting cpu cycles hashing entries that don't move
+  if((num_optimized << MIN_RT_HASHMAP_OPTIMIZATION_SHIFT) < map->count)
+    // only back off to a maximum amount only to ensure that we would eventually run optimize again
+    // TODO: Figure out better heuristic
+    if(map->optimize_deleted_shift >= 0 || (map->optimize_deleted_shift < 0 &&
+      (map->size >> map->optimize_deleted_shift) > 128))
+      map->optimize_deleted_shift--;
 }
 
 void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)
@@ -166,6 +201,7 @@ void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)
 
   map->count = 0;
   map->deleted_count = 0;
+  map->optimize_deleted_shift = MAX_RT_HASHMAP_DELETED_SHIFT_INITIAL;
   map->size = size;
 
   if(size > 0)
@@ -202,6 +238,7 @@ void ponyint_rt_hashmap_destroy(rt_hashmap_t* map, free_size_fn fr, free_fn free
 
   map->count = 0;
   map->deleted_count = 0;
+  map->optimize_deleted_shift = MAX_RT_HASHMAP_DELETED_SHIFT_INITIAL;
   map->size = 0;
   map->buckets = NULL;
   map->item_bitmap = NULL;
