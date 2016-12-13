@@ -12,6 +12,8 @@
 // Maximum percent of deleted entries compared to valid entries allowed before initial optimization
 // The shift value is the multiplier before a comparison is done against the count
 // Positive == left shift; negative == right shift
+// A shift of 4 effectively equals a maximum percentage of 6.25%
+// A shift of 3 effectively equals a maximum percentage of 12.5%
 // A shift of 2 effectively equals a maximum percentage of 25%
 // A shift of 1 effectively equals a maximum percentage of 50%
 // A shift of 0 effectively equals a maximum percentage of 100%
@@ -35,6 +37,20 @@
 // A shift of 0 effectively equals a minimum percentage of 100%
 // NOTE: A shift is used to avoid floating point math as a performance optimization
 #define MIN_RT_HASHMAP_OPTIMIZATION_SHIFT 4
+
+// Maximum percent of entries optimized compared to valid entries by an optimize
+// so we increase how often we optimize by modulating the MAX_RT_HASHMAP_DELETED_SHIFT_INITIAL
+// shift
+// The shift value is the multiplier before a comparison is done against the count
+// A shift of 6 effectively equals a minimum percentage of 1.5625%
+// A shift of 5 effectively equals a minimum percentage of 3.125%
+// A shift of 4 effectively equals a minimum percentage of 6.25%
+// A shift of 3 effectively equals a minimum percentage of 12.5%
+// A shift of 2 effectively equals a minimum percentage of 25%
+// A shift of 1 effectively equals a minimum percentage of 50%
+// A shift of 0 effectively equals a minimum percentage of 100%
+// NOTE: A shift is used to avoid floating point math as a performance optimization
+#define MAX_RT_HASHMAP_OPTIMIZATION_SHIFT 3
 
 // Minimum RT_HASHMAP size for hashmap before optimization is considered
 #define MIN_RT_HASHMAP_OPTIMIZE_SIZE 2048
@@ -118,9 +134,6 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
 {
   // Don't optimize if the hashmap is too small or if the # deleted items is not large enough
   // TODO: figure out right heuristic for when to optimize
-  // TODO: The objectmap is likely to reach steady state where optimize isn't actually moving
-  //       any items. Need a way to identify that and not run optimize as often in that case
-  //       to not pay the penalty of hashing the keys all the time
   // TODO: For RT_HASHMAP, maybe consider not using a hash function at all but just do a mask
   //       on the memory addresses themselves? Need to run a probe distribution test to confirm
   //       if it would result in too many collisions or not
@@ -159,7 +172,8 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
         break;
 
       // found an earlier deleted bucket so move item
-      if(map->buckets[index].ptr == DELETED) {
+      if(map->buckets[index].ptr == DELETED)
+      {
         ponyint_rt_hashmap_removeindex(map, old_index);
         ponyint_rt_hashmap_putindex(map, entry, key, hash, alloc, fr, index);
         num_optimized++;
@@ -171,10 +185,18 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
     }
   }
 
+//  printf("optimized.. size: %lu, count: %lu, deleted_count: %lu, optimize_deleted_shift: %ld, num_optimized: %lu\n", map->size, map->count, map->deleted_count, map->optimize_deleted_shift, num_optimized);
+
   // reset deleted count to 0 since we only care about new deletions since the last optimize
   // this is because the deleted elements will accumulate in the hashmap as time goes on
   // and entries are added and removed
   map->deleted_count = 0;
+
+
+  // The hashmap is likely to reach steady state where optimize is barely moving any
+  // items because new items get deleted and long lived items are already in optimal
+  // position. The following is a way to identify that and not run optimize as often
+  // in that case to not pay the penalty of hashing the keys all the time
 
   // back off on when next optimize will occur because we didn't optimize enough entries
   // during this optimize run to avoid wasting cpu cycles hashing entries that don't move
@@ -184,6 +206,14 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
     if(map->optimize_deleted_shift >= 0 || (map->optimize_deleted_shift < 0 &&
       (map->size >> map->optimize_deleted_shift) > 128))
       map->optimize_deleted_shift--;
+
+  // increase frequency of when next optimize will occur because we optimized too many  entries
+  // during this optimize run to avoid wasting cpu cycles via unnecessary probing
+  if((num_optimized << MAX_RT_HASHMAP_OPTIMIZATION_SHIFT) > map->count)
+    // only increase frequency to a maximum # deleted of 6.25% of count
+    // TODO: Figure out better heuristic
+    if(map->optimize_deleted_shift < 4)
+      map->optimize_deleted_shift++;
 }
 
 void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)
