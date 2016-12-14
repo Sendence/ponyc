@@ -129,63 +129,23 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
 //  printf("resized.. old size: %lu, old count: %lu, new size: %lu, new count: %lu\n", s, c, map->size, map->count);
 }
 
-void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
-  free_size_fn fr)
+bool ponyint_rt_hashmap_needs_optimize(rt_hashmap_t* map)
 {
   // Don't optimize if the hashmap is too small or if the # deleted items is not large enough
   // TODO: figure out right heuristic for when to optimize
-  // TODO: For RT_HASHMAP, maybe consider not using a hash function at all but just do a mask
-  //       on the memory addresses themselves? Need to run a probe distribution test to confirm
-  //       if it would result in too many collisions or not
-  // TODO: Maybe consider doing optimize work as part of `sweep` to avoid a second memory access
-  //       of the same hashmap memory?
   if((map->size < MIN_RT_HASHMAP_OPTIMIZE_SIZE) ||
     (((map->deleted_count << 1) < map->size) &&
     (((map->optimize_deleted_shift >= 0) ?
        map->deleted_count << map->optimize_deleted_shift :
        map->deleted_count >> map->optimize_deleted_shift) < (map->count))))
-    return;
+    return false;
 
-  size_t old_index = RT_HASHMAP_BEGIN;
-  void* entry = NULL;
-  uintptr_t key = 0;
+  return true;
+}
 
-  size_t mask = map->size - 1;
-
-  size_t h = 0;
-  size_t index = 0;
-
-  size_t num_optimized = 0;
-
-  // find element in the array
-  while((entry = ponyint_rt_hashmap_next(map, &old_index)) != NULL)
-  {
-    // get key and calculate hash
-    key = map->buckets[old_index].data;
-    h = hash(key);
-    index = h & mask;
-
-    for(size_t i = 1; i <= mask; i++)
-    {
-      // if next bucket index is current position, item is already in optimal spot
-      if(index == old_index)
-        break;
-
-      // found an earlier deleted bucket so move item
-      if(map->buckets[index].ptr == DELETED)
-      {
-        ponyint_rt_hashmap_removeindex(map, old_index);
-        ponyint_rt_hashmap_putindex(map, entry, key, hash, alloc, fr, index);
-        num_optimized++;
-        break;
-      }
-
-      // find next bucket index
-      index = (h + ((i + (i * i)) >> 1)) & mask;
-    }
-  }
-
-//  printf("optimized.. size: %lu, count: %lu, deleted_count: %lu, optimize_deleted_shift: %ld, num_optimized: %lu\n", map->size, map->count, map->deleted_count, map->optimize_deleted_shift, num_optimized);
+void ponyint_rt_hashmap_finish_optimize(rt_hashmap_t* map, size_t num_optimized)
+{
+//  printf("finish optimize.. size: %lu, count: %lu, deleted_count: %lu, optimize_deleted_shift: %ld, num_optimized: %lu\n", map->size, map->count, map->deleted_count, map->optimize_deleted_shift, num_optimized);
 
   // reset deleted count to 0 since we only care about new deletions since the last optimize
   // this is because the deleted elements will accumulate in the hashmap as time goes on
@@ -214,6 +174,36 @@ void ponyint_rt_hashmap_optimize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn al
     // TODO: Figure out better heuristic
     if(map->optimize_deleted_shift < 4)
       map->optimize_deleted_shift++;
+}
+
+size_t ponyint_rt_hashmap_optimize_item(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
+  free_size_fn fr, size_t old_index, void* entry, uintptr_t key)
+{
+
+  size_t mask = map->size - 1;
+
+  size_t h = hash(key);
+  size_t index = h & mask;
+
+  for(size_t i = 1; i <= mask; i++)
+  {
+    // if next bucket index is current position, item is already in optimal spot
+    if(index == old_index)
+      break;
+
+    // found an earlier deleted bucket so move item
+    if(map->buckets[index].ptr == DELETED)
+    {
+      ponyint_rt_hashmap_removeindex(map, old_index);
+      ponyint_rt_hashmap_putindex(map, entry, key, hash, alloc, fr, index);
+      return 1;
+    }
+
+    // find next bucket index
+    index = (h + ((i + (i * i)) >> 1)) & mask;
+  }
+
+  return 0;
 }
 
 void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)

@@ -77,6 +77,10 @@ size_t ponyint_objectmap_sweep(objectmap_t* map)
   size_t i = RT_HASHMAP_BEGIN;
   object_t* obj;
 
+  // find out if map needs optimizing
+  bool needs_optimize = ponyint_objectmap_needs_optimize(map);
+  size_t num_optimized = 0;
+
   while((obj = ponyint_objectmap_next(map, &i)) != NULL)
   {
     void* p = obj->address;
@@ -85,6 +89,10 @@ size_t ponyint_objectmap_sweep(objectmap_t* map)
     {
       chunk_t* chunk = (chunk_t*)ponyint_pagemap_get(p);
       ponyint_heap_mark_shallow(chunk, p);
+
+      // try and optimize item if needed
+      if(needs_optimize)
+        num_optimized += ponyint_objectmap_optimize_item(map, obj, (uintptr_t)p, i);
     } else {
       if(obj->final != NULL)
       {
@@ -93,7 +101,12 @@ size_t ponyint_objectmap_sweep(objectmap_t* map)
         chunk_t* chunk = (chunk_t*)ponyint_pagemap_get(p);
 
         if(ponyint_heap_ismarked(chunk, p))
+        {
+          // try and optimize item if needed
+          if(needs_optimize)
+            num_optimized += ponyint_objectmap_optimize_item(map, obj, (uintptr_t)p, i);
           continue;
+        }
 
         obj->final(p);
         count++;
@@ -104,8 +117,9 @@ size_t ponyint_objectmap_sweep(objectmap_t* map)
     }
   }
 
-  // optimize map if too many deleted entries
-  ponyint_objectmap_optimize(map);
+  // finish optimization if needed
+  if(needs_optimize)
+    ponyint_objectmap_finish_optimize(map, num_optimized);
 
   return count;
 }

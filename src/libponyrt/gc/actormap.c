@@ -57,10 +57,19 @@ static actorref_t* move_unmarked_objects(actorref_t* from, uint32_t mark)
   size_t i = RT_HASHMAP_BEGIN;
   object_t* obj;
 
+  // find out if map needs optimizing
+  bool needs_optimize = ponyint_objectmap_needs_optimize(&from->map);
+  size_t num_optimized = 0;
+
   while((obj = ponyint_objectmap_next(&from->map, &i)) != NULL)
   {
     if(obj->mark == mark)
+    {
+      // try and optimize item if needed
+      if(needs_optimize)
+        num_optimized += ponyint_objectmap_optimize_item(&from->map, obj, (uintptr_t)obj->address, i);
       continue;
+    }
 
     ponyint_objectmap_removeindex(&from->map, i);
 
@@ -74,8 +83,9 @@ static actorref_t* move_unmarked_objects(actorref_t* from, uint32_t mark)
     ponyint_objectmap_put(&to->map, obj, (uintptr_t)obj->address);
   }
 
-  // optimize map if too many deleted entries
-  ponyint_objectmap_optimize(&from->map);
+  // finish optimization if needed
+  if(needs_optimize)
+    ponyint_objectmap_finish_optimize(&from->map, num_optimized);
 
   return to;
 }
@@ -121,10 +131,17 @@ deltamap_t* ponyint_actormap_sweep(pony_ctx_t* ctx, actormap_t* map,
   size_t i = RT_HASHMAP_BEGIN;
   actorref_t* aref;
 
+  // find out if map needs optimizing
+  bool needs_optimize = ponyint_actormap_needs_optimize(map);
+  size_t num_optimized = 0;
+
   while((aref = ponyint_actormap_next(map, &i)) != NULL)
   {
     if(aref->mark == mark)
     {
+      // try and optimize item if needed
+      if(needs_optimize)
+        num_optimized += ponyint_actormap_optimize_item(map, aref, (uintptr_t)aref->actor, i);
       aref = move_unmarked_objects(aref, mark);
     } else {
       ponyint_actormap_removeindex(map, i);
@@ -134,8 +151,9 @@ deltamap_t* ponyint_actormap_sweep(pony_ctx_t* ctx, actormap_t* map,
     send_release(ctx, aref);
   }
 
-  // optimize map if too many deleted entries
-  ponyint_actormap_optimize(map);
+  // finish optimization if needed
+  if(needs_optimize)
+    ponyint_actormap_finish_optimize(map, num_optimized);
 
   return delta;
 }
