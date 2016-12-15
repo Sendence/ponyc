@@ -60,7 +60,7 @@ static bool valid(void* entry)
 }
 
 static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
-  cmp_fn cmp, alloc_fn alloc, free_size_fn fr)
+  cmp_fn cmp, alloc_fn alloc, free_size_fn fr, bool in_remove)
 {
   size_t index_del = map->size;
   size_t mask = index_del - 1;
@@ -87,7 +87,7 @@ static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
         index_del = index;
     } else if(cmp(key, elem)) {
       // found an earlier deleted bucket so move item
-      if(index_del <= mask)
+      if(in_remove == false && index_del <= mask)
       {
         ponyint_hashmap_removeindex(map, index);
         ponyint_hashmap_putindex(map, elem, hash, cmp, alloc, fr, index_del);
@@ -280,7 +280,7 @@ void* ponyint_hashmap_get(hashmap_t* map, void* key, hash_fn hash, cmp_fn cmp, s
   if(map->count == 0)
     return NULL;
 
-  return search(map, pos, key, hash, cmp, alloc, fr);
+  return search(map, pos, key, hash, cmp, alloc, fr, false);
 }
 
 void* ponyint_hashmap_put(hashmap_t* map, void* entry, hash_fn hash, cmp_fn cmp,
@@ -290,7 +290,7 @@ void* ponyint_hashmap_put(hashmap_t* map, void* entry, hash_fn hash, cmp_fn cmp,
     ponyint_hashmap_init(map, 4, alloc);
 
   size_t pos;
-  void* elem = search(map, &pos, entry, hash, cmp, alloc, fr);
+  void* elem = search(map, &pos, entry, hash, cmp, alloc, fr, false);
 
   map->buckets[pos] = entry;
 
@@ -350,7 +350,7 @@ void* ponyint_hashmap_remove(hashmap_t* map, void* entry, hash_fn hash,
     return NULL;
 
   size_t pos;
-  void* elem = search(map, &pos, entry, hash, cmp, alloc, fr);
+  void* elem = search(map, &pos, entry, hash, cmp, alloc, fr, true);
 
   if(elem != NULL)
   {
