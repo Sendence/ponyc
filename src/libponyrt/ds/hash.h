@@ -70,7 +70,8 @@ size_t ponyint_hashmap_optimize_item(hashmap_t* map, hash_fn hash, alloc_fn allo
  *
  *  Returns a pointer to the element, or NULL.
  */
-void* ponyint_hashmap_get(hashmap_t* map, void* key, hash_fn hash, cmp_fn cmp, size_t* index);
+void* ponyint_hashmap_get(hashmap_t* map, void* key, hash_fn hash, cmp_fn cmp, size_t* index,
+  alloc_fn alloc, free_size_fn fr);
 
 /** Put a new element in a hash map.
  *
@@ -94,7 +95,7 @@ void* ponyint_hashmap_putindex(hashmap_t* map, void* entry, hash_fn hash, cmp_fn
  *  Returns the element removed (if any).
  */
 void* ponyint_hashmap_remove(hashmap_t* map, void* entry, hash_fn hash,
-  cmp_fn cmp);
+  cmp_fn cmp, alloc_fn alloc, free_size_fn fr);
 
 /** Removes a given entry from a hash map by index.
  *
@@ -165,7 +166,7 @@ void* ponyint_hashmap_next(hashmap_t* map, size_t* i);
     name##_hash_fn hashf = hash; \
     name##_cmp_fn cmpf = cmp; \
     return (type*)ponyint_hashmap_get((hashmap_t*)map, (void*)key, \
-      (hash_fn)hashf, (cmp_fn)cmpf, index); \
+      (hash_fn)hashf, (cmp_fn)cmpf, index, alloc, fr); \
   } \
   type* name##_put(name_t* map, type* entry) \
   { \
@@ -186,7 +187,7 @@ void* ponyint_hashmap_next(hashmap_t* map, size_t* i);
     name##_hash_fn hashf = hash; \
     name##_cmp_fn cmpf = cmp; \
     return (type*)ponyint_hashmap_remove((hashmap_t*) map, (void*)entry, \
-      (hash_fn)hashf, (cmp_fn)cmpf); \
+      (hash_fn)hashf, (cmp_fn)cmpf, alloc, fr); \
   } \
   type* name##_removeindex(name_t* map, size_t index) \
   { \

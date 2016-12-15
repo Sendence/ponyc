@@ -60,7 +60,7 @@ static bool valid(void* entry)
 }
 
 static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
-  cmp_fn cmp)
+  cmp_fn cmp, alloc_fn alloc, free_size_fn fr)
 {
   size_t index_del = map->size;
   size_t mask = index_del - 1;
@@ -86,7 +86,15 @@ static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
       if(index_del > mask)
         index_del = index;
     } else if(cmp(key, elem)) {
-      *pos = index;
+      // found an earlier deleted bucket so move item
+      if(index_del <= mask)
+      {
+        ponyint_hashmap_removeindex(map, index);
+        ponyint_hashmap_putindex(map, elem, hash, cmp, alloc, fr, index_del);
+        *pos = index_del;
+      } else {
+        *pos = index;
+      }
       return elem;
     }
 
@@ -266,12 +274,13 @@ void ponyint_hashmap_destroy(hashmap_t* map, free_size_fn fr, free_fn free_elem)
   map->item_bitmap = NULL;
 }
 
-void* ponyint_hashmap_get(hashmap_t* map, void* key, hash_fn hash, cmp_fn cmp, size_t* pos)
+void* ponyint_hashmap_get(hashmap_t* map, void* key, hash_fn hash, cmp_fn cmp, size_t* pos,
+  alloc_fn alloc, free_size_fn fr)
 {
   if(map->count == 0)
     return NULL;
 
-  return search(map, pos, key, hash, cmp);
+  return search(map, pos, key, hash, cmp, alloc, fr);
 }
 
 void* ponyint_hashmap_put(hashmap_t* map, void* entry, hash_fn hash, cmp_fn cmp,
@@ -281,7 +290,7 @@ void* ponyint_hashmap_put(hashmap_t* map, void* entry, hash_fn hash, cmp_fn cmp,
     ponyint_hashmap_init(map, 4, alloc);
 
   size_t pos;
-  void* elem = search(map, &pos, entry, hash, cmp);
+  void* elem = search(map, &pos, entry, hash, cmp, alloc, fr);
 
   map->buckets[pos] = entry;
 
@@ -335,13 +344,13 @@ void* ponyint_hashmap_putindex(hashmap_t* map, void* entry, hash_fn hash, cmp_fn
 }
 
 void* ponyint_hashmap_remove(hashmap_t* map, void* entry, hash_fn hash,
-  cmp_fn cmp)
+  cmp_fn cmp, alloc_fn alloc, free_size_fn fr)
 {
   if(map->count == 0)
     return NULL;
 
   size_t pos;
-  void* elem = search(map, &pos, entry, hash, cmp);
+  void* elem = search(map, &pos, entry, hash, cmp, alloc, fr);
 
   if(elem != NULL)
   {
