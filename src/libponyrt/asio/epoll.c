@@ -336,4 +336,5 @@ void pony_asio_event_resubscribe(asio_event_t* ev, uint32_t flags)
 
   epoll_ctl(b->epfd, EPOLL_CTL_MOD, ev->fd, &ep);
 }
+
 #endif
