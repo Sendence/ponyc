@@ -13,7 +13,6 @@
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 #ifdef USE_VALGRIND
 #include <valgrind/helgrind.h>
