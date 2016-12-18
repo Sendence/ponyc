@@ -133,7 +133,6 @@ DECLARE_THREAD_FN(ponyint_asio_backend_dispatch)
       uint32_t flags = 0;
       uint32_t count = 0;
 
-
       if(ev->flags & ASIO_READ)
       {
         if(ep->events & (EPOLLIN | EPOLLRDHUP | EPOLLHUP | EPOLLERR))
