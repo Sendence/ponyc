@@ -926,9 +926,11 @@ actor TCPConnection
       end
     end
 
+    @ponyint_actor_setoverloaded[None](this)
     _notify.throttled(this)
 
   fun ref _release_backpressure() =>
+    @ponyint_actor_unsetoverloaded[None](this)
     _notify.unthrottled(this)
 
   fun ref _resubscribe_event() =>

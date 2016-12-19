@@ -22,15 +22,10 @@ enum
   FLAG_SYSTEM = 1 << 2,
   FLAG_UNSCHEDULED = 1 << 3,
   FLAG_PENDINGDESTROY = 1 << 4,
-  FLAG_NOISEY = 1 << 5,
+  FLAG_OVERLOADED = 1 << 5,
 };
 
 static bool actor_noblock = false;
-
-void set_noisey(pony_actor_t* actor)
-{
-  actor->flags |= FLAG_NOISEY;
-}
 
 static bool has_flag(pony_actor_t* actor, uint8_t flag)
 {
@@ -154,12 +149,39 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
   try_gc(ctx, actor);
 
-  if(msgs == batch)
-    return !has_flag(actor, FLAG_UNSCHEDULED);
+  if(msgs == batch) {
+    printf("Batch size %lu hit\n", batch);
+
+    if(batch == 100) {
+      printf("Batch size hit going to 250\n");
+      actor->batch = 250;
+    }
+    else if (batch == 250) {
+      printf("Batch size hit going to 500\n");
+      actor->batch = 500;
+    }
+    else {
+      printf("Overloaded\n");
+      ponyint_actor_setoverloaded(actor);
+    }
+
+    return !has_flag(actor, FLAG_UNSCHEDULED) && !(actor->muted > 0);
+  }
 
   // We didn't hit our app message batch limit. We now believe our queue to be
   // empty, but we may have received further messages.
   assert(msgs < batch);
+
+  if (has_flag(actor, FLAG_OVERLOADED)) {
+    printf("clearing an overload\n");
+    unset_flag(actor, FLAG_OVERLOADED);
+  }
+
+  // If we are muted, block
+  if(actor->muted > 0) {
+    printf("RT-MUTED: %lu\n", actor->muted);
+    return false;
+  }
 
   // If we have processed any application level messages, defer blocking.
   if(apps > 0)
@@ -279,6 +301,8 @@ pony_actor_t* pony_create(pony_ctx_t* ctx, pony_type_t* type)
     actor->gc.rc = 0;
   }
 
+  actor->batch = 100;
+
   return actor;
 }
 
@@ -310,7 +334,10 @@ void pony_sendv(pony_ctx_t* ctx, pony_actor_t* to, pony_msg_t* m)
 
   if(ponyint_messageq_push(&to->q, m))
   {
-    if(!has_flag(to, FLAG_UNSCHEDULED))
+    if(has_flag(to, FLAG_OVERLOADED) || to->muted > 0)
+      ctx->current->muted += 1;
+
+    if(!has_flag(to, FLAG_UNSCHEDULED) && !(to->muted > 0))
       ponyint_sched_add(ctx, to);
   }
 }
@@ -416,4 +443,19 @@ void pony_poll(pony_ctx_t* ctx)
 {
   assert(ctx->current != NULL);
   ponyint_actor_run(ctx, ctx->current, 1);
+}
+
+void ponyint_actor_setoverloaded(pony_actor_t* actor)
+{
+  set_flag(actor, FLAG_OVERLOADED);
+}
+
+bool ponyint_actor_overloaded(pony_actor_t* actor)
+{
+  return has_flag(actor, FLAG_OVERLOADED);
+}
+
+void ponyint_actor_unsetoverloaded(pony_actor_t* actor)
+{
+  unset_flag(actor, FLAG_OVERLOADED);
 }

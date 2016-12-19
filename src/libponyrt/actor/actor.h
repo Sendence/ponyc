@@ -24,13 +24,13 @@ typedef struct pony_actor_t
   messageq_t q;
   pony_msg_t* continuation;
   uint8_t flags;
+  size_t batch;
+  size_t muted;
 
   // keep things accessed by other actors on a separate cache line
   __pony_spec_align__(heap_t heap, 64); // 52/104 bytes
   gc_t gc; // 44/80 bytes
 } pony_actor_t;
-
-void set_noisey(pony_actor_t* actor);
 
 bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch);
 
@@ -53,6 +53,10 @@ void ponyint_actor_setsystem(pony_actor_t* actor);
 void ponyint_actor_setnoblock(bool state);
 
 void ponyint_destroy(pony_actor_t* actor);
+
+void ponyint_actor_setoverloaded(pony_actor_t* actor);
+
+void ponyint_actor_unsetoverloaded(pony_actor_t* actor);
 
 PONY_EXTERN_C_END
 
