@@ -1,4 +1,5 @@
 use "ponytest"
+use "collections"
 
 actor Main is TestList
   new create(env: Env) => PonyTest(env, this)
@@ -17,6 +18,10 @@ actor Main is TestList
     test(_TestPathExt)
     test(_TestPathVolume)
     test(_TestFileEOF)
+    test(_TestFileOpenError)
+    test(_TestFileCreate)
+    test(_TestFileOpen)
+    test(_TestFileLongLine)
 
 primitive _FileHelper
   fun make_files(h: TestHelper, files: Array[String]): FilePath? =>
@@ -265,4 +270,79 @@ class iso _TestFileEOF is UnitTest
         h.assert_true(file.errno() is FileEOF)
       end
       filepath.remove()
+    else
+      h.fail("Unhandled error!")
+    end
+
+
+class iso _TestFileOpenError is UnitTest
+  fun name(): String => "files/File.open-error"
+  fun apply(h: TestHelper) =>
+    try
+      let path = "tmp.openerror"
+      let filepath = FilePath(h.env.root as AmbientAuth, path)
+      let file = OpenFile(filepath)
+      h.assert_true(file is FileError)
+    else
+      h.fail("Unhandled error!")
+    end
+
+
+class iso _TestFileCreate is UnitTest
+  fun name(): String => "files/File.create"
+  fun apply(h: TestHelper) =>
+    try
+      let path = "tmp.create"
+      let filepath = FilePath(h.env.root as AmbientAuth, path)
+      let file = CreateFile(filepath) as File
+      file.print("foobar")
+      file.dispose()
+      let file2 = CreateFile(filepath) as File
+      let line1 = file2.line()
+      h.assert_eq[String]("foobar", consume line1 )
+      file2.dispose()
+      filepath.remove()
+    else
+      h.fail("Unhandled error!")
+    end
+
+
+class iso _TestFileOpen is UnitTest
+  fun name(): String => "files/File.open"
+  fun apply(h: TestHelper) =>
+    try
+      let path = "tmp.open"
+      let filepath = FilePath(h.env.root as AmbientAuth, path)
+      let file = CreateFile(filepath) as File
+      file.print("foobar")
+      file.dispose()
+      let file2 = OpenFile(filepath) as File
+      let line1 = file2.line()
+      h.assert_eq[String]("foobar", consume line1 )
+      file2.dispose()
+      filepath.remove()
+    else
+      h.fail("Unhandled error!")
+    end
+
+
+class iso _TestFileLongLine is UnitTest
+  fun name(): String => "files/File.longline"
+  fun apply(h: TestHelper) =>
+    try
+      let path = "tmp.longline"
+      let filepath = FilePath(h.env.root as AmbientAuth, path)
+      let file = File(filepath)
+      var longline = "foobar"
+      for d in Range(0, 10) do
+        longline = longline + longline
+      end
+      file.print(longline)
+      file.sync()
+      file.seek_start(0)
+      let line1 = file.line()
+      h.assert_eq[String](longline, consume line1 )
+      filepath.remove()
+    else
+      h.fail("Unhandled error!")
     end
