@@ -334,6 +334,9 @@ actor TCPConnection
     _muted = false
     _pending_reads()
 
+  be _unmute() =>
+    _pending_reads()
+
   be set_notify(notify: TCPConnectionNotify iso) =>
     """
     Change the notifier.

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include "mutemap.h"
 
 #define SCHED_BATCH 100
 
@@ -22,7 +23,8 @@ typedef enum
   SCHED_UNBLOCK,
   SCHED_CNF,
   SCHED_ACK,
-  SCHED_TERMINATE
+  SCHED_TERMINATE,
+  SCHED_UNMUTE_ACTOR
 } sched_msg_t;
 
 // Scheduler global data.
@@ -128,6 +130,12 @@ static void read_msg(scheduler_t* sched)
       case SCHED_TERMINATE:
       {
         sched->terminate = true;
+        break;
+      }
+
+      case SCHED_UNMUTE_ACTOR:
+      {
+        ponyint_sched_unmute(&sched->ctx, (pony_actor_t*)m->i, false);
         break;
       }
 
@@ -272,6 +280,8 @@ static void run(scheduler_t* sched)
 
   while(true)
   {
+    read_msg(sched);
+
     if(actor == NULL)
     {
       // We had an empty queue and no rescheduled actor.
@@ -470,4 +480,65 @@ void pony_register_thread()
 pony_ctx_t* pony_ctx()
 {
   return &this_scheduler->ctx;
+}
+
+void ponyint_sched_mute(pony_ctx_t* ctx, pony_actor_t* sender, pony_actor_t* recv)
+{
+  scheduler_t* sched = ctx->scheduler;
+  size_t index;
+  muteref_t key;
+  key.key = recv;
+
+  muteref_t* mref = ponyint_mutemap_get(&sched->mute_mapping, &key, &index);
+  if(mref == NULL)
+  {
+    mref = ponyint_muteref_alloc(recv);
+    ponyint_mutemap_putindex(&sched->mute_mapping, mref, index);
+  }
+
+  pony_actor_t* r = ponyint_muteset_get(&mref->value, sender, &index);
+  if(r == NULL)
+  {
+    ponyint_muteset_putindex(&mref->value, sender, index);
+    sender->muted += 1;
+  }
+}
+
+void ponyint_sched_unmute(pony_ctx_t* ctx, pony_actor_t* actor, bool inform)
+{
+  scheduler_t* sched = ctx->scheduler;
+  size_t index;
+  muteref_t key;
+  key.key = actor;
+
+  muteref_t* mref = ponyint_mutemap_get(&sched->mute_mapping, &key, &index);
+
+  if(mref != NULL)
+  {
+    size_t i = HASHMAP_BEGIN;
+    pony_actor_t* muted = NULL;
+
+    while((muted = ponyint_muteset_next(&mref->value, &i)) != NULL)
+    {
+      assert(muted->muted > 0);
+      muted->muted -= 1;
+
+      if(muted->muted == 0)
+      {
+        ponyint_sched_add(ctx, muted);
+        ponyint_sched_unmute(ctx, muted, true);
+      }
+    }
+
+    if(inform)
+    {
+      for(uint32_t i = 0; i < scheduler_count; i++)
+      {
+        if(&scheduler[i] != sched)
+          send_msg(i, SCHED_UNMUTE_ACTOR, (intptr_t)actor);
+      }
+    }
+
+    ponyint_mutemap_removeindex(&sched->mute_mapping, index);
+  }
 }

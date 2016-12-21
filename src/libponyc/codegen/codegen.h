@@ -141,6 +141,7 @@ typedef struct compile_t
   const char* str__init;
   const char* str__final;
   const char* str__event_notify;
+  const char* str__unmute;
 
   LLVMCallConv callconv;
   LLVMLinkage linkage;
