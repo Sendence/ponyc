@@ -485,7 +485,7 @@ pony_ctx_t* pony_ctx()
 void ponyint_sched_mute(pony_ctx_t* ctx, pony_actor_t* sender, pony_actor_t* recv)
 {
   scheduler_t* sched = ctx->scheduler;
-  size_t index = HASHMAP_BEGIN;
+  size_t index;
   muteref_t key;
   key.key = recv;
 
@@ -493,11 +493,10 @@ void ponyint_sched_mute(pony_ctx_t* ctx, pony_actor_t* sender, pony_actor_t* rec
   if(mref == NULL)
   {
     mref = ponyint_muteref_alloc(recv);
-    printf("index: %lu\n", index);
     ponyint_mutemap_putindex(&sched->mute_mapping, mref, index);
   }
 
-  size_t index2 = HASHMAP_BEGIN;
+  size_t index2;
   pony_actor_t* r = ponyint_muteset_get(&mref->value, sender, &index2);
   if(r == NULL)
   {
@@ -509,9 +508,18 @@ void ponyint_sched_mute(pony_ctx_t* ctx, pony_actor_t* sender, pony_actor_t* rec
 void ponyint_sched_unmute(pony_ctx_t* ctx, pony_actor_t* actor, bool inform)
 {
   scheduler_t* sched = ctx->scheduler;
-  size_t index = HASHMAP_BEGIN;
+  size_t index;
   muteref_t key;
   key.key = actor;
+
+  if(inform)
+  {
+    for(uint32_t i = 0; i < scheduler_count; i++)
+    {
+      if(&scheduler[i] != sched)
+        send_msg(i, SCHED_UNMUTE_ACTOR, (intptr_t)actor);
+    }
+  }
 
   muteref_t* mref = ponyint_mutemap_get(&sched->mute_mapping, &key, &index);
 
@@ -529,15 +537,6 @@ void ponyint_sched_unmute(pony_ctx_t* ctx, pony_actor_t* actor, bool inform)
       {
         ponyint_sched_add(ctx, muted);
         ponyint_sched_unmute(ctx, muted, true);
-      }
-    }
-
-    if(inform)
-    {
-      for(uint32_t i = 0; i < scheduler_count; i++)
-      {
-        if(&scheduler[i] != sched)
-          send_msg(i, SCHED_UNMUTE_ACTOR, (intptr_t)actor);
       }
     }
 

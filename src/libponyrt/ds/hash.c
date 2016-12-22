@@ -157,7 +157,10 @@ void* ponyint_hashmap_putindex(hashmap_t* map, void* entry, hash_fn hash, cmp_fn
     return ponyint_hashmap_put(map, entry, hash, cmp, alloc, fr);
 
   if(map->size == 0)
+  {
     ponyint_hashmap_init(map, 4, alloc);
+    search(map, &pos, entry, hash, cmp);
+  }
 
   assert(pos <= map->size);
   void* elem = map->buckets[pos];
