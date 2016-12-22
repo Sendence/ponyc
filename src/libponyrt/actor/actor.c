@@ -159,8 +159,13 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
   if(msgs == batch)
   {
-    if (actor->batch >= BATCH_OVERLOADED)
+    if ((batch >= BATCH_OVERLOADED) &&
+      (apps >= (msgs >> 1))) {
+      if(!has_flag(actor, FLAG_OVERLOADED)) {
+        printf("overloaded\n");
+      }
       ponyint_actor_setoverloaded(actor);
+    }
     else
       actor->batch += INCR_BATCH;
 
@@ -173,7 +178,8 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
   // we don't mute overloaded actors so, we don't need to check to see
   // if we bailed on the batch when we became muted
-  if (has_flag(actor, FLAG_OVERLOADED)) {
+  if(has_flag(actor, FLAG_OVERLOADED)) {
+    printf("clearing an overload: %lu\n", batch);
     unset_flag(actor, FLAG_OVERLOADED);
 
     ponyint_sched_unmute(ctx, actor, true);
@@ -183,8 +189,12 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
   if(actor->muted > 0)
     return false;
 
-  if (msgs < (batch - DECR_BATCH))
+  if(msgs < (batch - DECR_BATCH)) {
+    if(batch >= BATCH_OVERLOADED) {
+      printf("decrementing batch: %lu\n", batch);
+    }
     actor->batch -= DECR_BATCH;
+  }
 
   // If we have processed any application level messages, defer blocking.
   if(apps > 0)
@@ -335,6 +345,20 @@ void pony_sendv(pony_ctx_t* ctx, pony_actor_t* to, pony_msg_t* m)
 {
   DTRACE2(ACTOR_MSG_SEND, (uintptr_t)ctx->scheduler, m->id);
 
+  if(ctx->current != NULL)
+  {
+    if(m->id <= ACTORMSG_APPLICATION_START)
+    {
+      if(!has_flag(ctx->current, FLAG_OVERLOADED) &&
+        (has_flag(to, FLAG_OVERLOADED) || to->muted > 0))
+      {
+        printf("muting\n");
+        ponyint_sched_mute(ctx, ctx->current, to);
+        // should we lower batch size for sender?
+      }
+    }
+  }
+
   if(ponyint_messageq_push(&to->q, m))
   {
     if(!has_flag(to, FLAG_UNSCHEDULED) && !(to->muted > 0))
@@ -345,13 +369,6 @@ void pony_sendv(pony_ctx_t* ctx, pony_actor_t* to, pony_msg_t* m)
 void pony_send(pony_ctx_t* ctx, pony_actor_t* to, uint32_t id)
 {
   pony_msg_t* m = pony_alloc_msg(POOL_INDEX(sizeof(pony_msg_t)), id);
-
-  if(!has_flag(ctx->current, FLAG_OVERLOADED) &&
-    (has_flag(to, FLAG_OVERLOADED) || to->muted > 0))
-  {
-    ponyint_sched_mute(ctx, ctx->current, to);
-    // should we lower batch size for sender?
-  }
 
   pony_sendv(ctx, to, m);
 }
