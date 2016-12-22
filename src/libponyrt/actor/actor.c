@@ -159,14 +159,14 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
   if(msgs == batch)
   {
-    if ((batch >= BATCH_OVERLOADED) &&
-      (apps >= (msgs >> 1))) {
-      if(!has_flag(actor, FLAG_OVERLOADED)) {
-        printf("overloaded\n");
-      }
-      ponyint_actor_setoverloaded(actor);
-    }
-    else
+    // if ((batch >= BATCH_OVERLOADED) &&
+    //   (apps >= (msgs >> 1))) {
+    //   if(!has_flag(actor, FLAG_OVERLOADED)) {
+    //     printf("overloaded\n");
+    //   }
+    //   ponyint_actor_setoverloaded(actor);
+    // }
+    // else
       actor->batch += INCR_BATCH;
 
     return !has_flag(actor, FLAG_UNSCHEDULED) && !(actor->muted > 0);
@@ -190,9 +190,9 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
     return false;
 
   if(msgs < (batch - DECR_BATCH)) {
-    if(batch >= BATCH_OVERLOADED) {
-      printf("decrementing batch: %lu\n", batch);
-    }
+    // if(batch >= BATCH_OVERLOADED) {
+    //   printf("decrementing batch: %lu\n", batch);
+    // }
     actor->batch -= DECR_BATCH;
   }
 
