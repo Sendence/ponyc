@@ -18,6 +18,7 @@
 #define INITIAL_BATCH 100
 #define INCR_BATCH 50
 #define DECR_BATCH 25
+#define BATCH_OVERLOADED 500
 
 enum
 {
@@ -159,7 +160,13 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
   try_gc(ctx, actor);
 
   if(msgs == batch) {
-    actor->batch += INCR_BATCH;
+    if ((batch >= BATCH_OVERLOADED) &&
+      (apps >= (msgs >> 1))) {
+      ;
+    }
+    else
+      actor->batch += INCR_BATCH;
+
     return !has_flag(actor, FLAG_UNSCHEDULED);
   }
 
