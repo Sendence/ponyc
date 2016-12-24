@@ -16,6 +16,7 @@ actor Main is TestList
     test(_TestArrays)
     test(_TestFailures)
     test(_TestBoxedMachineWord)
+    test(_TestBuffered)
 
 class _MachineWords
   var bool1: Bool = true
@@ -233,3 +234,133 @@ class iso _TestBoxedMachineWord is UnitTest
     let y = sx(deserialise) as _BoxedWord
     h.assert_true(x isnt y)
     h.assert_true((y.f as U64) == 7)
+
+class iso _TestBuffered is UnitTest
+  """
+  Test serialising using SerialisedBuffer.
+  """
+  fun name(): String => "serialise/Buffered"
+
+  fun apply(h: TestHelper) ? =>
+    let ambient = h.env.root as AmbientAuth
+    let serialise = SerialiseAuth(ambient)
+    let deserialise = DeserialiseAuth(ambient)
+    let buf: Array[U8] ref = Array[U8]
+
+    let x: _Simple = _Simple
+    let sx = SerialisedBuffer(serialise, x, buf)
+    let y = sx(deserialise) as _Simple
+    h.assert_true(x isnt y)
+    h.assert_true(x == y)
+
+    let x2: _BoxedWord = _BoxedWord
+    x2.f = U64(7)
+    let sx2 = SerialisedBuffer(serialise, x2, buf)
+    let y2 = sx2(deserialise) as _BoxedWord
+    h.assert_true(x2 isnt y2)
+    h.assert_true((y2.f as U64) == 7)
+
+    let x3: Array[U128] = [1, 2, 3]
+    var sx3 = SerialisedBuffer(serialise, x3, buf)
+    let y3 = sx3(deserialise) as Array[U128]
+    h.assert_true(x3 isnt y3)
+    h.assert_array_eq[U128](x3, y3)
+
+    let x4: Array[Bool] = [true, false, true]
+    var sx4 = SerialisedBuffer(serialise, x4, buf)
+    let y4 = sx4(deserialise) as Array[Bool]
+    h.assert_true(x4 isnt y4)
+    h.assert_array_eq[Bool](x4, y4)
+
+    let x5: Array[U32] = [1, 2, 3]
+    var sx5 = SerialisedBuffer(serialise, x5, buf)
+    let y5 = sx5(deserialise) as Array[U32]
+    h.assert_true(x5 isnt y5)
+    h.assert_array_eq[U32](x5, y5)
+
+    let x6: Array[(U16, Bool)] = [(1, true), (2, false), (3, true)]
+    var sx6 = SerialisedBuffer(serialise, x6, buf)
+    let y6 = sx6(deserialise) as Array[(U16, Bool)]
+    h.assert_true(x6 isnt y6)
+
+    var i = USize(0)
+    while i < x6.size() do
+      h.assert_eq[U16](x6(i)._1, y6(i)._1)
+      h.assert_eq[Bool](x6(i)._2, y6(i)._2)
+      i = i + 1
+    end
+
+    let x7: Array[String] = ["hi", "there", "folks"]
+    var sx7 = SerialisedBuffer(serialise, x7, buf)
+    let y7 = sx7(deserialise) as Array[String]
+    h.assert_true(x7 isnt y7)
+    h.assert_array_eq[String](x7, y7)
+
+    let x8: Array[_StructWords] =
+      [as _StructWords: _StructWords, _StructWords, _StructWords]
+    var sx8 = SerialisedBuffer(serialise, x8, buf)
+    let y8 = sx8(deserialise) as Array[_StructWords]
+    h.assert_true(x8 isnt y8)
+
+    i = 0
+    while i < x8.size() do
+      h.assert_true(x8(i) isnt y8(i))
+      h.assert_true(x8(i) == y8(i))
+      i = i + 1
+    end
+
+    let x9: Array[U64] = recover Array[U64] end
+    var sx9 = SerialisedBuffer(serialise, x9, buf)
+    let y9 = sx9(deserialise) as Array[U64]
+    h.assert_true(x9 isnt y9)
+    h.assert_array_eq[U64](x9, y9)
+
+    // deserialise everything again to make sure the old serialised data didn't
+    // clobbered accidentally
+    let new_y = sx(deserialise) as _Simple
+    h.assert_true(x isnt new_y)
+    h.assert_true(x == new_y)
+
+    let new_y2 = sx2(deserialise) as _BoxedWord
+    h.assert_true(x2 isnt new_y2)
+    h.assert_true((new_y2.f as U64) == 7)
+
+    let new_y3 = sx3(deserialise) as Array[U128]
+    h.assert_true(x3 isnt new_y3)
+    h.assert_array_eq[U128](x3, new_y3)
+
+    let new_y4 = sx4(deserialise) as Array[Bool]
+    h.assert_true(x4 isnt new_y4)
+    h.assert_array_eq[Bool](x4, new_y4)
+
+    let new_y5 = sx5(deserialise) as Array[U32]
+    h.assert_true(x5 isnt new_y5)
+    h.assert_array_eq[U32](x5, new_y5)
+
+    let new_y6 = sx6(deserialise) as Array[(U16, Bool)]
+    h.assert_true(x6 isnt new_y6)
+
+    i = USize(0)
+    while i < x6.size() do
+      h.assert_eq[U16](x6(i)._1, new_y6(i)._1)
+      h.assert_eq[Bool](x6(i)._2, new_y6(i)._2)
+      i = i + 1
+    end
+
+    let new_y7 = sx7(deserialise) as Array[String]
+    h.assert_true(x7 isnt new_y7)
+    h.assert_array_eq[String](x7, new_y7)
+
+    let new_y8 = sx8(deserialise) as Array[_StructWords]
+    h.assert_true(x8 isnt new_y8)
+
+    i = 0
+    while i < x8.size() do
+      h.assert_true(x8(i) isnt new_y8(i))
+      h.assert_true(x8(i) == new_y8(i))
+      i = i + 1
+    end
+
+    let new_y9 = sx9(deserialise) as Array[U64]
+    h.assert_true(x9 isnt new_y9)
+    h.assert_array_eq[U64](x9, new_y9)

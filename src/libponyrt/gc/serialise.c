@@ -158,7 +158,7 @@ size_t pony_serialise_offset(pony_ctx_t* ctx, void* p)
   return (size_t)t->id | HIGH_BIT;
 }
 
-void pony_serialise(pony_ctx_t* ctx, void* p, void* out)
+size_t pony_serialise(pony_ctx_t* ctx, void* p, void* out)
 {
   // This can raise an error.
   assert(ctx->stack == NULL);
@@ -170,9 +170,13 @@ void pony_serialise(pony_ctx_t* ctx, void* p, void* out)
   ponyint_gc_handlestack(ctx);
 
   ponyint_array_t* r = (ponyint_array_t*)out;
-  r->size = ctx->serialise_size;
+
+  size_t serialise_size = ctx->serialise_size;
+  size_t offset = r->size;
+
+  r->size = r->size + ctx->serialise_size;
   r->alloc = r->size;
-  r->ptr = (char*)pony_alloc(ctx, r->size);
+  r->ptr = (char*)pony_realloc(ctx, r->ptr, r->size);
 
   size_t i = HASHMAP_BEGIN;
   serialise_t* s;
@@ -180,10 +184,11 @@ void pony_serialise(pony_ctx_t* ctx, void* p, void* out)
   while((s = ponyint_serialise_next(&ctx->serialise, &i)) != NULL)
   {
     if(s->t != NULL)
-      s->t->serialise(ctx, (void*)s->key, r->ptr, s->value, s->mutability);
+      s->t->serialise(ctx, (void*)s->key, r->ptr + offset, s->value, s->mutability);
   }
 
   serialise_cleanup(ctx);
+  return serialise_size;
 }
 
 void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
@@ -271,12 +276,12 @@ void* pony_deserialise_block(pony_ctx_t* ctx, uintptr_t offset, size_t size)
   return block;
 }
 
-void* pony_deserialise(pony_ctx_t* ctx, void* in)
+void* pony_deserialise(pony_ctx_t* ctx, void* in, size_t offset, size_t size)
 {
   // This can raise an error.
   ponyint_array_t* r = (ponyint_array_t*)in;
-  ctx->serialise_buffer = r->ptr;
-  ctx->serialise_size = r->size;
+  ctx->serialise_buffer = r->ptr + offset;
+  ctx->serialise_size = size;
 
   void* object = pony_deserialise_offset(ctx, NULL, 0);
   ponyint_gc_handlestack(ctx);

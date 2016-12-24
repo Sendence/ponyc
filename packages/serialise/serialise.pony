@@ -72,7 +72,7 @@ class val Serialised
     A caller with SerialiseAuth can create serialised data from any object.
     """
     let r = recover Array[U8] end
-    @pony_serialise[None](@pony_ctx[Pointer[None]](), data, r) ?
+    @pony_serialise[USize](@pony_ctx[Pointer[None]](), data, r) ?
     _data = consume r
 
   new input(auth: InputSerialisedAuth, data: Array[U8] val) =>
@@ -90,7 +90,7 @@ class val Serialised
     A caller with DeserialiseAuth can create an object graph from serialised
     data.
     """
-    @pony_deserialise[Any iso^](@pony_ctx[Pointer[None]](), _data) ?
+    @pony_deserialise[Any iso^](@pony_ctx[Pointer[None]](), _data, USize(0), _data.size()) ?
 
   fun output(auth: OutputSerialisedAuth): Array[U8] val =>
     """
@@ -99,3 +99,40 @@ class val Serialised
     for example, a file or socket.
     """
     _data
+
+class val SerialisedBuffer
+  """
+  This represents serialised data. How it can be used depends on the other
+  capabilities a caller holds.
+  """
+  let _data: Array[U8] ref
+  let _offset: USize
+  let _size: USize
+
+  new create(auth: SerialiseAuth, data: Any box, buf: Array[U8] ref) ? =>
+    """
+    A caller with SerialiseAuth can create serialised data from any object at
+    the end of the buffer they provide. The buffer will be resized if necessary.
+    """
+    _offset = buf.size()
+    _size = @pony_serialise[USize](@pony_ctx[Pointer[None]](), data, buf) ?
+    _data = buf
+
+  fun apply(auth: DeserialiseAuth): Any iso^ ? =>
+    """
+    A caller with DeserialiseAuth can create an object graph from serialised
+    data.
+    """
+    @pony_deserialise[Any iso^](@pony_ctx[Pointer[None]](), _data, _offset, _size) ?
+
+  fun size(): USize =>
+    """
+    Return the size of the serialized data
+    """
+    _size
+
+  fun offset(): USize =>
+    """
+    Return the offset of the serialized data in the array
+    """
+    _offset
