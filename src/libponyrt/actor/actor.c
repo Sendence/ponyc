@@ -15,6 +15,9 @@
 #include <valgrind/helgrind.h>
 #endif
 
+#define INITIAL_BATCH 100
+#define INCR_BATCH 50
+
 enum
 {
   FLAG_BLOCKED = 1 << 0,
@@ -148,18 +151,20 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
     msgs++;
 
-    if(msgs == batch || msg == head)
+    if(apps == batch || msg == head)
       break;
   }
 
   try_gc(ctx, actor);
 
-  if(msgs == batch)
+  if(apps == batch) {
+    actor->batch += INCR_BATCH;
     return !has_flag(actor, FLAG_UNSCHEDULED);
+  }
 
   // We didn't hit our app message batch limit. We now believe our queue to be
   // empty, but we may have received further messages.
-  assert(msgs < batch);
+  assert(apps < batch);
 
   // If we have processed any application level messages, defer blocking.
   if(apps > 0)
@@ -278,6 +283,8 @@ pony_actor_t* pony_create(pony_ctx_t* ctx, pony_type_t* type)
     // no creator, so the actor isn't referenced by anything
     actor->gc.rc = 0;
   }
+
+  actor->batch = INITIAL_BATCH;
 
   return actor;
 }

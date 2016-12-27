@@ -13,7 +13,6 @@
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 #ifdef USE_VALGRIND
 #include <valgrind/helgrind.h>
@@ -133,7 +132,6 @@ DECLARE_THREAD_FN(ponyint_asio_backend_dispatch)
       asio_event_t* ev = ep->data.ptr;
       uint32_t flags = 0;
       uint32_t count = 0;
-
 
       if(ev->flags & ASIO_READ)
       {
@@ -338,4 +336,5 @@ void pony_asio_event_resubscribe(asio_event_t* ev, uint32_t flags)
 
   epoll_ctl(b->epfd, EPOLL_CTL_MOD, ev->fd, &ep);
 }
+
 #endif
