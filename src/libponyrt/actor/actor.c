@@ -17,8 +17,6 @@
 
 #define INITIAL_BATCH 100
 #define INCR_BATCH 50
-#define DECR_BATCH 25
-#define BATCH_OVERLOADED 500
 
 enum
 {
@@ -153,29 +151,20 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
     msgs++;
 
-    if(msgs == batch || msg == head)
+    if(apps == batch || msg == head)
       break;
   }
 
   try_gc(ctx, actor);
 
-  if(msgs == batch) {
-    if ((batch >= BATCH_OVERLOADED) &&
-      (apps >= (msgs >> 1))) {
-      ;
-    }
-    else
-      actor->batch += INCR_BATCH;
-
+  if(apps == batch) {
+    actor->batch += INCR_BATCH;
     return !has_flag(actor, FLAG_UNSCHEDULED);
   }
 
   // We didn't hit our app message batch limit. We now believe our queue to be
   // empty, but we may have received further messages.
-  assert(msgs < batch);
-
-  if(msgs < (batch - DECR_BATCH))
-    actor->batch -= DECR_BATCH;
+  assert(apps < batch);
 
   // If we have processed any application level messages, defer blocking.
   if(apps > 0)
