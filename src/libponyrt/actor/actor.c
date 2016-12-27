@@ -16,6 +16,7 @@
 #endif
 
 #define INITIAL_BATCH 100
+#define INCR_BATCH 50
 
 enum
 {
@@ -156,8 +157,10 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
 
   try_gc(ctx, actor);
 
-  if(apps == batch)
+  if(apps == batch) {
+    actor->batch += INCR_BATCH;
     return !has_flag(actor, FLAG_UNSCHEDULED);
+  }
 
   // We didn't hit our app message batch limit. We now believe our queue to be
   // empty, but we may have received further messages.
