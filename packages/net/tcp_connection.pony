@@ -170,9 +170,9 @@ actor TCPConnection
 
   var _next_size: USize
   let _max_size: USize
-  let _max_read: USize
 
   var _read_len: USize = 0
+  var _reading: Bool = false
   var _expect: USize = 0
 
   var _muted: Bool = false
@@ -187,8 +187,7 @@ actor TCPConnection
     """
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
-    _max_read = 16_384
+    _max_size = max_size
     _notify = consume notify
     _connect_count = @pony_os_connect_tcp[U32](this,
       host.cstring(), service.cstring(),
@@ -204,8 +203,7 @@ actor TCPConnection
     """
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
-    _max_read = 16_384
+    _max_size = max_size
     _notify = consume notify
     _connect_count = @pony_os_connect_tcp4[U32](this,
       host.cstring(), service.cstring(),
@@ -221,8 +219,7 @@ actor TCPConnection
     """
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
-    _max_read = 16_384
+    _max_size = max_size
     _notify = consume notify
     _connect_count = @pony_os_connect_tcp6[U32](this,
       host.cstring(), service.cstring(),
@@ -250,8 +247,7 @@ actor TCPConnection
     _writeable = true
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
-    _max_read = 16_384
+    _max_size = max_size
 
     _notify.accepted(this)
     _queue_read()
@@ -700,36 +696,15 @@ actor TCPConnection
     """
     ifdef not windows then
       try
+        var max_reads: U8 = 50
+        var reads: U8 = 0
         var sum: USize = 0
+        _reading = true
 
         while _readable and not _shutdown_peer do
           if _muted then
+            _reading = false
             return
-          end
-
-          while (_expect_read_buf.size() > 0) and
-            (_expect_read_buf.size() >= _expect)
-          do
-            let block_size = if _expect != 0 then
-              _expect
-            else
-              _expect_read_buf.size()
-            end
-
-            let out = _expect_read_buf.block(block_size)
-            let carry_on = _notify.received(this, consume out)
-            if not carry_on then
-              _read_again()
-              return
-            end
-
-            sum = sum + block_size
-
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
-            end
           end
 
           // Read as much data as possible.
@@ -739,15 +714,18 @@ actor TCPConnection
             _read_buf.cpointer().usize() + _read_len,
             _read_buf.size() - _read_len) ?
 
+          reads = reads + 1
+
           match len
           | 0 =>
             // Would block, try again later.
             _readable = false
             _resubscribe_event()
+            _reading = false
             return
           | _next_size =>
             // Increase the read buffer size.
-            _next_size = _max_read.min(_next_size * 2)
+            _next_size = _max_size.min(_next_size * 2)
           end
 
           _read_len = _read_len + len
@@ -774,14 +752,16 @@ actor TCPConnection
               let carry_on = _notify.received(this, consume out)
               if not carry_on then
                 _read_again()
+                _reading = false
                 return
               end
 
               sum = sum + osize
 
-              if sum >= _max_size then
+              if (sum >= _max_size) or (reads >= max_reads) then
                 // If we've read _max_size, yield and read again later.
                 _read_again()
+                _reading = false
                 return
               end
             end
@@ -794,6 +774,7 @@ actor TCPConnection
             let carry_on = _notify.received(this, consume data)
             if not carry_on then
               _read_again()
+              _reading = false
               return
             end
 
@@ -802,6 +783,7 @@ actor TCPConnection
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
               _read_again()
+              _reading = false
               return
             end
           end
@@ -811,6 +793,8 @@ actor TCPConnection
         _shutdown_peer = true
         close()
       end
+
+      _reading = false
     end
 
   fun ref _notify_connecting() =>
