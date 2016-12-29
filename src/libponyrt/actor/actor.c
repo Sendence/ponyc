@@ -17,6 +17,7 @@
 
 #define INITIAL_BATCH 100
 #define INCR_BATCH 50
+#define BATCH_THRESHOLD 1000
 
 enum
 {
@@ -158,7 +159,9 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
   try_gc(ctx, actor);
 
   if(apps == batch) {
-    actor->batch += INCR_BATCH;
+    if(batch < BATCH_THRESHOLD) {
+      actor->batch += INCR_BATCH;
+    }
     return !has_flag(actor, FLAG_UNSCHEDULED);
   }
 
