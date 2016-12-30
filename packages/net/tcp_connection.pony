@@ -663,12 +663,8 @@ actor TCPConnection
     """
     Resize the read buffer.
     """
-    ifdef windows then
-      if _expect != 0 then
-        _read_buf.undefined(_expect)
-      else
-        _read_buf.undefined(_next_size)
-      end
+    if _expect != 0 then
+      _read_buf.undefined(_expect)
     else
       _read_buf.undefined(_next_size)
     end
