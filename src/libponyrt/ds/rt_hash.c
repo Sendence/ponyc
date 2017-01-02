@@ -60,7 +60,8 @@ static bool valid(void* entry)
   return ((uintptr_t)entry) > ((uintptr_t)DELETED);
 }
 
-static void* search(rt_hashmap_t* map, size_t* pos, uintptr_t key, rt_hash_fn hash)
+static void* search(rt_hashmap_t* map, size_t* pos, uintptr_t key, rt_hash_fn hash,
+  alloc_fn alloc, free_size_fn fr, bool in_remove)
 {
   size_t index_del = map->size;
   size_t mask = index_del - 1;
@@ -83,8 +84,17 @@ static void* search(rt_hashmap_t* map, size_t* pos, uintptr_t key, rt_hash_fn ha
       if(index_del > mask)
         index_del = index;
     } else if(key == map->buckets[index].data) {
-      *pos = index;
-      return map->buckets[index].ptr;
+      // found an earlier deleted bucket so move item
+      void* elem = map->buckets[index].ptr;
+      if(in_remove == false && index_del <= mask)
+      {
+        ponyint_rt_hashmap_removeindex(map, index);
+        ponyint_rt_hashmap_putindex(map, elem, key, hash, alloc, fr, index_del);
+        *pos = index_del;
+      } else {
+        *pos = index;
+      }
+      return elem;
     }
 
     index = (h + ((i + (i * i)) >> 1)) & mask;
@@ -265,12 +275,13 @@ void ponyint_rt_hashmap_destroy(rt_hashmap_t* map, free_size_fn fr, free_fn free
   map->item_bitmap = NULL;
 }
 
-void* ponyint_rt_hashmap_get(rt_hashmap_t* map, uintptr_t key, rt_hash_fn hash, size_t* pos)
+void* ponyint_rt_hashmap_get(rt_hashmap_t* map, uintptr_t key, rt_hash_fn hash, size_t* pos,
+  alloc_fn alloc, free_size_fn fr)
 {
   if(map->count == 0)
     return NULL;
 
-  return search(map, pos, key, hash);
+  return search(map, pos, key, hash, alloc, fr, false);
 }
 
 void* ponyint_rt_hashmap_put(rt_hashmap_t* map, void* entry, uintptr_t key, rt_hash_fn hash,
@@ -280,7 +291,7 @@ void* ponyint_rt_hashmap_put(rt_hashmap_t* map, void* entry, uintptr_t key, rt_h
     ponyint_rt_hashmap_init(map, 4, alloc);
 
   size_t pos;
-  void* elem = search(map, &pos, key, hash);
+  void* elem = search(map, &pos, key, hash, alloc, fr, false);
 
   map->buckets[pos].ptr = entry;
   map->buckets[pos].data = key;
@@ -341,13 +352,14 @@ void* ponyint_rt_hashmap_putindex(rt_hashmap_t* map, void* entry, uintptr_t key,
   return elem;
 }
 
-void* ponyint_rt_hashmap_remove(rt_hashmap_t* map, uintptr_t key, rt_hash_fn hash)
+void* ponyint_rt_hashmap_remove(rt_hashmap_t* map, uintptr_t key, rt_hash_fn hash,
+  alloc_fn alloc, free_size_fn fr)
 {
   if(map->count == 0)
     return NULL;
 
   size_t pos;
-  void* elem = search(map, &pos, key, hash);
+  void* elem = search(map, &pos, key, hash, alloc, fr, true);
 
   if(elem != NULL)
   {
