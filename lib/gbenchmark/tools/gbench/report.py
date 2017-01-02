@@ -86,10 +86,8 @@ def generate_difference_report(json1, json2, use_color=True):
             continue
 
         def get_color(res):
-            if res > 0.05:
+            if res > 0.00:
                 return BC_FAIL
-            elif res > -0.07:
-                return BC_WHITE
             else:
                 return BC_CYAN
         fmt_str = "{}{:<{}s}{endc}    {}{:+.2f}{endc}         {}{:+.2f}{endc}         {:4d}         {:4d}"
