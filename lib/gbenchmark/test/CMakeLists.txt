@@ -1,6 +1,7 @@
 # Enable the tests
 
 find_package(Threads REQUIRED)
+link_directories(${PROJECT_SOURCE_DIR}/../../build/release)
 
 # NOTE: These flags must be added after find_package(Threads REQUIRED) otherwise
 # they will break the configuration check.
