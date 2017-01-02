@@ -135,6 +135,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashNext)(benchmark::State& st) {
 }
 
 BENCHMARK_REGISTER_F(HashMapTest, HashNext)->RangeMultiplier(2)->Ranges({{1<<10, 32<<10}, {1, 32}, {0, 0}, {0, 0}});
+BENCHMARK_REGISTER_F(HashMapTest, HashNext)->RangeMultiplier(2)->Ranges({{1, 1}, {1<<10, 32<<10}, {0, 0}, {0, 0}});
 
 BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
   hash_elem_t* curr = NULL;
@@ -150,7 +151,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
   }
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashPut)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 15<<10}});
+BENCHMARK_REGISTER_F(HashMapTest, HashPut)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 16<<10}});
 
 BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
   hash_elem_t* curr = NULL;
@@ -166,7 +167,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
   }
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashPutIndex)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 15<<10}});
+BENCHMARK_REGISTER_F(HashMapTest, HashPutIndex)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 16<<10}});
 
 BENCHMARK_DEFINE_F(HashMapTest, HashRemove)(benchmark::State& st) {
   hash_elem_t* curr = get_element();
