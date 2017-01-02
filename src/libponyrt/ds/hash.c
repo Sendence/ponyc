@@ -107,12 +107,14 @@ static void resize(hashmap_t* map, hash_fn hash, cmp_fn cmp, alloc_fn alloc,
 
   map->count = 0;
   map->size = (s < MIN_HASHMAP_SIZE) ? MIN_HASHMAP_SIZE : s << 3;
-  map->buckets = (void**)alloc(map->size * sizeof(void*));
-  memset(map->buckets, 0, map->size * sizeof(void*));
 
+  // use a single memory allocation to exploit spatial memory/cache locality
   size_t bitmap_size = map->size/HASHMAP_BITMAP_TYPE_SIZE + (map->size%HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
-  map->item_bitmap = (bitmap_t*)alloc(bitmap_size * sizeof(bitmap_t));
-  memset(map->item_bitmap, 0, bitmap_size * sizeof(bitmap_t));
+  void* mem_alloc = alloc((bitmap_size * sizeof(bitmap_t)) + (map->size * sizeof(void*)));
+  memset(mem_alloc, 0, (bitmap_size * sizeof(bitmap_t)) + (map->size * sizeof(void*)));
+  map->item_bitmap = (bitmap_t*)mem_alloc;
+  map->buckets = (void**)(mem_alloc + (bitmap_size * sizeof(bitmap_t)));
+//  printf("map: ib: %lu, ib_size: %lu, b: %lu, b_size: %lu\n", (uintptr_t)map->item_bitmap, bitmap_size * sizeof(bitmap_t), (uintptr_t)map->buckets, map->size * sizeof(void*));
 
   for(size_t i = 0; i < s; i++)
   {
@@ -124,9 +126,8 @@ static void resize(hashmap_t* map, hash_fn hash, cmp_fn cmp, alloc_fn alloc,
 
   if((fr != NULL) && (b != NULL))
   {
-    fr(s * sizeof(void*), b);
     size_t old_bitmap_size = s/HASHMAP_BITMAP_TYPE_SIZE + (s%HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
-    fr(old_bitmap_size * sizeof(bitmap_t), old_item_bitmap);
+    fr((old_bitmap_size * sizeof(bitmap_t)) + (s * sizeof(void*)), old_item_bitmap);
   }
 
 }
@@ -226,12 +227,13 @@ void ponyint_hashmap_init(hashmap_t* map, size_t size, alloc_fn alloc)
 
   if(size > 0)
   {
-    map->buckets = (void**)alloc(size * sizeof(void*));
-    memset(map->buckets, 0, size * sizeof(void*));
+    // use a single memory allocation to exploit spatial memory/cache locality
     size_t bitmap_size = size/HASHMAP_BITMAP_TYPE_SIZE + (size%HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
-    map->item_bitmap = (bitmap_t*)alloc(bitmap_size * sizeof(bitmap_t));
-    memset(map->item_bitmap, 0, bitmap_size * sizeof(bitmap_t));
-
+    void* mem_alloc = alloc((bitmap_size * sizeof(bitmap_t)) + (size * sizeof(void*)));
+    memset(mem_alloc, 0, (bitmap_size * sizeof(bitmap_t)) + (size * sizeof(void*)));
+    map->item_bitmap = (bitmap_t*)mem_alloc;
+    map->buckets = (void**)(mem_alloc + (bitmap_size * sizeof(bitmap_t)));
+//    printf("map: ib: %lu, ib_size: %lu, b: %lu, b_size: %lu\n", (uintptr_t)map->item_bitmap, bitmap_size * sizeof(bitmap_t), (uintptr_t)map->buckets, size * sizeof(void*));
   } else {
     map->buckets = NULL;
     map->item_bitmap = NULL;
@@ -255,9 +257,8 @@ void ponyint_hashmap_destroy(hashmap_t* map, free_size_fn fr, free_fn free_elem)
 
   if((fr != NULL) && (map->size > 0))
   {
-    fr(map->size * sizeof(void*), map->buckets);
     size_t bitmap_size = map->size/HASHMAP_BITMAP_TYPE_SIZE + (map->size%HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
-    fr(bitmap_size * sizeof(bitmap_t), map->item_bitmap);
+    fr((bitmap_size * sizeof(bitmap_t)) + (map->size * sizeof(void*)), map->item_bitmap);
   }
 
   map->count = 0;
