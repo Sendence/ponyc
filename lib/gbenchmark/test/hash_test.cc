@@ -235,12 +235,10 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearchDeletes)(benchmark::State& st) {
     size_t *a = new size_t[testmap_size(&_map)];
     size_t ind = RT_HASHMAP_UNKNOWN;
     size_t ind2 = RT_HASHMAP_UNKNOWN;
-    size_t num_optimized = 0;
 
     for(size_t i = 0; i < testmap_size(&_map); i++) {
       hash_elem_t* n = testmap_next(&_map, &ind);
       if(n != NULL) {
-        num_optimized += testmap_optimize_item(&_map, n, n->key, ind);
         a[i] = n->key;
         ind2 = RT_HASHMAP_UNKNOWN;
         hash_elem_t* n2 = testmap_get(&_map, n->key, &ind2);
@@ -250,7 +248,6 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearchDeletes)(benchmark::State& st) {
         printf("shouldn't happen\n");
       }
     }
-    testmap_finish_optimize(&_map, num_optimized);
     st.ResumeTiming();
 
     for(int i = 0; i < st.range(3); i++) {
