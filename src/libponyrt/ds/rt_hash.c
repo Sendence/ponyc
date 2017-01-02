@@ -106,12 +106,14 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
   map->deleted_count = 0;
   map->optimize_deleted_shift = MAX_RT_HASHMAP_DELETED_SHIFT_INITIAL;
   map->size = (s < MIN_RT_HASHMAP_SIZE) ? MIN_RT_HASHMAP_SIZE : s << 3;
-  map->buckets = (rt_hashmap_entry_t*)alloc(map->size * sizeof(rt_hashmap_entry_t));
-  memset(map->buckets, 0, map->size * sizeof(rt_hashmap_entry_t));
 
+  // use a single memory allocation to exploit spatial memory/cache locality
   size_t bitmap_size = map->size/RT_HASHMAP_BITMAP_TYPE_SIZE + (map->size%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
-  map->item_bitmap = (bitmap_t*)alloc(bitmap_size * sizeof(bitmap_t));
-  memset(map->item_bitmap, 0, bitmap_size * sizeof(bitmap_t));
+  void* mem_alloc = alloc((bitmap_size * sizeof(bitmap_t)) + (map->size * sizeof(rt_hashmap_entry_t)));
+  memset(mem_alloc, 0, (bitmap_size * sizeof(bitmap_t)) + (map->size * sizeof(rt_hashmap_entry_t)));
+  map->item_bitmap = (bitmap_t*)mem_alloc;
+  map->buckets = (rt_hashmap_entry_t*)(mem_alloc + (bitmap_size * sizeof(bitmap_t)));
+//  printf("map: ib: %lu, ib_size: %lu, b: %lu, b_size: %lu\n", (uintptr_t)map->item_bitmap, bitmap_size * sizeof(bitmap_t), (uintptr_t)map->buckets, map->size * sizeof(rt_hashmap_entry_t));
 
   for(size_t i = 0; i < s; i++)
   {
@@ -121,9 +123,8 @@ static void resize(rt_hashmap_t* map, rt_hash_fn hash, alloc_fn alloc,
 
   if((fr != NULL) && (b != NULL))
   {
-    fr(s * sizeof(rt_hashmap_entry_t), b);
     size_t old_bitmap_size = s/RT_HASHMAP_BITMAP_TYPE_SIZE + (s%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
-    fr(old_bitmap_size * sizeof(bitmap_t), old_item_bitmap);
+    fr((old_bitmap_size * sizeof(bitmap_t)) + (s * sizeof(rt_hashmap_entry_t)), old_item_bitmap);
   }
 
 //  printf("resized.. old size: %lu, old count: %lu, new size: %lu, new count: %lu\n", s, c, map->size, map->count);
@@ -226,12 +227,13 @@ void ponyint_rt_hashmap_init(rt_hashmap_t* map, size_t size, alloc_fn alloc)
 
   if(size > 0)
   {
-    map->buckets = (rt_hashmap_entry_t*)alloc(size * sizeof(rt_hashmap_entry_t));
-    memset(map->buckets, 0, size * sizeof(rt_hashmap_entry_t));
+    // use a single memory allocation to exploit spatial memory/cache locality
     size_t bitmap_size = size/RT_HASHMAP_BITMAP_TYPE_SIZE + (size%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
-    map->item_bitmap = (bitmap_t*)alloc(bitmap_size * sizeof(bitmap_t));
-    memset(map->item_bitmap, 0, bitmap_size * sizeof(bitmap_t));
-
+    void* mem_alloc = alloc((bitmap_size * sizeof(bitmap_t)) + (size * sizeof(rt_hashmap_entry_t)));
+    memset(mem_alloc, 0, (bitmap_size * sizeof(bitmap_t)) + (size * sizeof(rt_hashmap_entry_t)));
+    map->item_bitmap = (bitmap_t*)mem_alloc;
+    map->buckets = (rt_hashmap_entry_t*)(mem_alloc + (bitmap_size * sizeof(bitmap_t)));
+//    printf("map: ib: %lu, ib_size: %lu, b: %lu, b_size: %lu\n", (uintptr_t)map->item_bitmap, bitmap_size * sizeof(bitmap_t), (uintptr_t)map->buckets, size * sizeof(rt_hashmap_entry_t));
   } else {
     map->buckets = NULL;
     map->item_bitmap = NULL;
@@ -251,9 +253,8 @@ void ponyint_rt_hashmap_destroy(rt_hashmap_t* map, free_size_fn fr, free_fn free
 
   if((fr != NULL) && (map->size > 0))
   {
-    fr(map->size * sizeof(rt_hashmap_entry_t), map->buckets);
     size_t bitmap_size = map->size/RT_HASHMAP_BITMAP_TYPE_SIZE + (map->size%RT_HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
-    fr(bitmap_size * sizeof(bitmap_t), map->item_bitmap);
+    fr((bitmap_size * sizeof(bitmap_t)) + (map->size * sizeof(rt_hashmap_entry_t)), map->item_bitmap);
   }
 
   map->count = 0;
