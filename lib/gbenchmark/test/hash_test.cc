@@ -47,8 +47,11 @@ void HashMapTest::SetUp(const ::benchmark::State& st)
 {
   if (st.thread_index == 0) {
 //    printf("setup; init: %d\n", st.range(0));
+    // range(0) == initial size of hashmap
     testmap_init(&_map, st.range(0));
+    // range(1) == # of items to insert
     put_elements(st.range(1));
+    // range(2) == % of items to delete at random
     delete_elements(st.range(2), st.range(1));
     srand(635356);
   }
@@ -81,7 +84,7 @@ void HashMapTest::delete_elements(size_t del_pct, size_t count)
   size_t key = 0;
   size_t del_count = del_pct/100.0 * count;
 
-//  for(size_t i = 0; i < del_count; i++)
+  // delete random items until map size is as small as required
   while(testmap_size(&_map) > count - del_count)
   {
     key = rand() % count;
@@ -141,6 +144,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
   hash_elem_t* curr = NULL;
   while (st.KeepRunning()) {
     st.PauseTiming();
+    // exclude deleting previously inserted items time
     size_t ind = RT_HASHMAP_UNKNOWN;
     size_t num_elems = testmap_size(&_map);
     for(size_t i = 0; i < num_elems; i++) {
@@ -157,6 +161,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
     for(int i = 0; i < st.range(3); i++)
     {
       st.PauseTiming();
+      // exclude allocating new item time
       curr = get_element();
       st.ResumeTiming();
       curr->key = i;
@@ -173,6 +178,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
   hash_elem_t* curr = NULL;
   while (st.KeepRunning()) {
     st.PauseTiming();
+    // exclude deleting previously inserted items time
     size_t ind = RT_HASHMAP_UNKNOWN;
     size_t num_elems = testmap_size(&_map);
     for(size_t i = 0; i < num_elems; i++) {
@@ -189,6 +195,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
     for(int i = 0; i < st.range(3); i++)
     {
       st.PauseTiming();
+      // exclude allocating new item time
       curr = get_element();
       st.ResumeTiming();
       curr->key = i;
@@ -204,6 +211,7 @@ BENCHMARK_REGISTER_F(HashMapTest, HashPutIndex)->RangeMultiplier(2)->Ranges({{32
 BENCHMARK_DEFINE_F(HashMapTest, HashRemove)(benchmark::State& st) {
   while (st.KeepRunning()) {
     st.PauseTiming();
+    // exclude inserting items to delete time
     put_elements(st.range(3));
     st.ResumeTiming();
     for(int i = 0; i < st.range(3); i++)
@@ -211,6 +219,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashRemove)(benchmark::State& st) {
       hash_elem_t* n2 = testmap_remove(&_map, i);
       if(n2 != NULL) {
         st.PauseTiming();
+        // exclude memory free time
         free_elem(n2);
         st.ResumeTiming();
       } else {
@@ -226,6 +235,7 @@ BENCHMARK_REGISTER_F(HashMapTest, HashRemove)->RangeMultiplier(2)->Ranges({{1, 1
 BENCHMARK_DEFINE_F(HashMapTest, HashRemoveIndex)(benchmark::State& st) {
   while (st.KeepRunning()) {
     st.PauseTiming();
+    // exclude inserting items to delete time
     put_elements(st.range(3));
     st.ResumeTiming();
     size_t max_elems = _map.contents.size;
@@ -234,6 +244,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashRemoveIndex)(benchmark::State& st) {
       hash_elem_t* n2 = testmap_removeindex(&_map, i);
       if(n2 != NULL) {
         st.PauseTiming();
+        // exclude memory free time
         free_elem(n2);
         st.ResumeTiming();
       }
@@ -249,6 +260,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearch)(benchmark::State& st) {
   while (st.KeepRunning()) {
     for(int i = 0; i < st.range(3); i++) {
       st.PauseTiming();
+      // exclude random # time
       key = rand() % st.range(1);
       st.ResumeTiming();
       size_t index = RT_HASHMAP_UNKNOWN;
@@ -264,28 +276,30 @@ BENCHMARK_REGISTER_F(HashMapTest, HashSearch)->RangeMultiplier(2)->Ranges({{1, 1
 
 BENCHMARK_DEFINE_F(HashMapTest, HashSearchDeletes)(benchmark::State& st) {
   size_t key = 0;
+  bool first_time = true;
+  size_t *a = NULL;
   while (st.KeepRunning()) {
     st.PauseTiming();
-    size_t *a = new size_t[testmap_size(&_map)];
-    size_t ind = RT_HASHMAP_UNKNOWN;
-    size_t ind2 = RT_HASHMAP_UNKNOWN;
+    if(first_time)
+    {
+      a = new size_t[testmap_size(&_map)];
+      size_t ind = RT_HASHMAP_UNKNOWN;
 
-    for(size_t i = 0; i < testmap_size(&_map); i++) {
-      hash_elem_t* n = testmap_next(&_map, &ind);
-      if(n != NULL) {
-        a[i] = n->key;
-        ind2 = RT_HASHMAP_UNKNOWN;
-        hash_elem_t* n2 = testmap_get(&_map, n->key, &ind2);
-        if(n2 == NULL)
+      for(size_t i = 0; i < testmap_size(&_map); i++) {
+        hash_elem_t* n = testmap_next(&_map, &ind);
+        if(n != NULL) {
+          a[i] = n->key;
+        } else {
           printf("shouldn't happen\n");
-      } else {
-        printf("shouldn't happen\n");
+        }
       }
+      first_time = false;
     }
     st.ResumeTiming();
 
     for(int i = 0; i < st.range(3); i++) {
       st.PauseTiming();
+      // exclude random # time
       key = a[rand() % testmap_size(&_map)];
       st.ResumeTiming();
       size_t index = RT_HASHMAP_UNKNOWN;
@@ -293,11 +307,9 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearchDeletes)(benchmark::State& st) {
       if(n2 == NULL)
         printf("shouldn't happen\n");
     }
-    st.PauseTiming();
-    delete[] a;
-    st.ResumeTiming();
     st.SetItemsProcessed(st.range(3));
   }
+  delete[] a;
 }
 
 BENCHMARK_REGISTER_F(HashMapTest, HashSearchDeletes)->RangeMultiplier(2)->Ranges({{1, 1}, {1<<10, 32<<10}, {64, 90}, {64, 1024}});
