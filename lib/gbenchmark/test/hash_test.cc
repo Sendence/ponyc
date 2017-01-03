@@ -142,7 +142,8 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
   while (st.KeepRunning()) {
     st.PauseTiming();
     size_t ind = HASHMAP_UNKNOWN;
-    for(size_t i = 0; i < testmap_size(&_map); i++) {
+    size_t num_elems = testmap_size(&_map);
+    for(size_t i = 0; i < num_elems; i++) {
       hash_elem_t* n = testmap_next(&_map, &ind);
       hash_elem_t* n2 = testmap_removeindex(&_map, ind);
       if(n == NULL || n2 ==  NULL)
@@ -170,7 +171,8 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
   while (st.KeepRunning()) {
     st.PauseTiming();
     size_t ind = HASHMAP_UNKNOWN;
-    for(size_t i = 0; i < testmap_size(&_map); i++) {
+    size_t num_elems = testmap_size(&_map);
+    for(size_t i = 0; i < num_elems; i++) {
       hash_elem_t* n = testmap_next(&_map, &ind);
       hash_elem_t* n2 = testmap_removeindex(&_map, ind);
       if(n == NULL || n2 ==  NULL)
