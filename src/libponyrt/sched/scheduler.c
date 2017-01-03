@@ -46,10 +46,7 @@ static pony_actor_t* pop(scheduler_t* sched)
  */
 static void push(scheduler_t* sched, pony_actor_t* actor)
 {
-  if(!is_special(actor))
-    ponyint_mpmcq_push_single(&sched->q, actor);
-  else
-    ponyint_mpmcq_push(&inject, actor);
+  ponyint_mpmcq_push_single(&sched->q, actor);
 }
 
 /**
@@ -228,6 +225,9 @@ static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
 
   sched->stealing = true;
 
+  struct timespec ts = {0, 0};
+  ts.tv_nsec = 25000000;
+
   scheduler_t* neighbor = sched - 1;
   if(neighbor < scheduler)
     neighbor = &scheduler[scheduler_count - 1];
@@ -235,7 +235,7 @@ static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
   while(true)
   {
     while(neighbor->stealing)
-      nanosleep(25000000)
+      nanosleep(&ts, NULL);
 
     scheduler_t* victim = choose_victim(sched);
 
