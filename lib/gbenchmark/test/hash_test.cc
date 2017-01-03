@@ -12,7 +12,7 @@
 
 typedef struct hash_elem_t hash_elem_t;
 
-DECLARE_HASHMAP(testmap, testmap_t, hash_elem_t);
+DECLARE_HASHMAP(testmap, testmap_t, hash_elem_t)
 
 class HashMapTest: public ::benchmark::Fixture
 {
@@ -35,7 +35,7 @@ class HashMapTest: public ::benchmark::Fixture
 
 DEFINE_HASHMAP(testmap, testmap_t, hash_elem_t, HashMapTest::hash_tst,
   HashMapTest::cmp_tst, malloc, HashMapTest::free_buckets,
-  HashMapTest::free_elem);
+  HashMapTest::free_elem)
 
 struct hash_elem_t
 {
@@ -230,7 +230,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearch)(benchmark::State& st) {
     st.SetItemsProcessed(st.range(3));
   }
   free_elem(e1);
-  e1 = NULL;
+  e1 = nullptr;
 }
 
 BENCHMARK_REGISTER_F(HashMapTest, HashSearch)->RangeMultiplier(2)->Ranges({{1, 1}, {1<<10, 32<<10}, {0, 0}, {64, 1024}});
@@ -275,7 +275,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearchDeletes)(benchmark::State& st) {
     st.SetItemsProcessed(st.range(3));
   }
   free_elem(e1);
-  e1 = NULL;
+  e1 = nullptr;
 }
 
 BENCHMARK_REGISTER_F(HashMapTest, HashSearchDeletes)->RangeMultiplier(2)->Ranges({{1, 1}, {1<<10, 32<<10}, {64, 90}, {64, 1024}});
