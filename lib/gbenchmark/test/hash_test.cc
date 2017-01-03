@@ -12,7 +12,7 @@
 
 typedef struct hash_elem_t hash_elem_t;
 
-DECLARE_RT_HASHMAP(testmap, testmap_t, hash_elem_t);
+DECLARE_RT_HASHMAP(testmap, testmap_t, hash_elem_t)
 
 class HashMapTest: public ::benchmark::Fixture
 {
@@ -35,7 +35,7 @@ class HashMapTest: public ::benchmark::Fixture
 
 DEFINE_RT_HASHMAP(testmap, testmap_t, hash_elem_t, HashMapTest::hash_tst,
   malloc, HashMapTest::free_buckets,
-  HashMapTest::free_elem);
+  HashMapTest::free_elem)
 
 struct hash_elem_t
 {
