@@ -229,12 +229,10 @@ static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
   ts.tv_nsec = 25000000;
 
   scheduler_t* neighbor = sched - 1;
-  if(neighbor < scheduler)
-    neighbor = &scheduler[scheduler_count - 1];
 
   while(true)
   {
-    while(neighbor->stealing)
+    while((neighbor >= scheduler) && neighbor->stealing)
       nanosleep(&ts, NULL);
 
     scheduler_t* victim = choose_victim(sched);
