@@ -48,6 +48,7 @@ struct scheduler_t
   uint32_t block_count;
   int32_t ack_token;
   uint32_t ack_count;
+  bool stealing;
 
   // These are accessed by other scheduler threads. The mpmcq_t is aligned.
   mpmcq_t q;

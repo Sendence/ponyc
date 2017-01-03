@@ -46,7 +46,10 @@ static pony_actor_t* pop(scheduler_t* sched)
  */
 static void push(scheduler_t* sched, pony_actor_t* actor)
 {
-  ponyint_mpmcq_push_single(&sched->q, actor);
+  if(!is_special(actor))
+    ponyint_mpmcq_push_single(&sched->q, actor);
+  else
+    ponyint_mpmcq_push(&inject, actor);
 }
 
 /**
@@ -223,8 +226,17 @@ static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
   uint64_t tsc = ponyint_cpu_tick();
   pony_actor_t* actor;
 
+  sched->stealing = true;
+
+  scheduler_t* neighbor = sched - 1;
+  if(neighbor < scheduler)
+    neighbor = &scheduler[scheduler_count - 1];
+
   while(true)
   {
+    while(neighbor->stealing)
+      nanosleep(25000000)
+
     scheduler_t* victim = choose_victim(sched);
 
     if(victim == NULL)
@@ -243,6 +255,7 @@ static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
     if(quiescent(sched, tsc, tsc2))
     {
       DTRACE2(WORK_STEAL_FAILURE, (uintptr_t)sched, (uintptr_t)victim);
+      sched->stealing = false;
       return NULL;
     }
 
@@ -256,6 +269,7 @@ static pony_actor_t* steal(scheduler_t* sched, pony_actor_t* prev)
     }
   }
 
+  sched->stealing = false;
   send_msg(0, SCHED_UNBLOCK, 0);
   return actor;
 }
