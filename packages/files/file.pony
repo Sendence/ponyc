@@ -433,7 +433,7 @@ class File
     if _fd != -1 then
       let o: ISize = 0
       let b: I32 = 1
-      let r = @lseek[ISize](_fd, o, b)
+      let r = @lseek[I32](_fd, o, b)
 
       if r < 0 then
         _errno = _get_error()
