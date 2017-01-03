@@ -232,7 +232,8 @@ BENCHMARK_DEFINE_F(HashMapTest, HashRemoveIndex)(benchmark::State& st) {
     st.PauseTiming();
     put_elements(st.range(3));
     st.ResumeTiming();
-    for(size_t i = 0; i < testmap_size(&_map); i++)
+    size_t max_elems = _map.contents.size;
+    for(size_t i = 0; i < max_elems; i++)
     {
       hash_elem_t* n2 = testmap_removeindex(&_map, i);
       if(n2 != NULL) {
