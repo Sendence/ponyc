@@ -148,6 +148,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
       hash_elem_t* n2 = testmap_removeindex(&_map, ind);
       if(n == NULL || n2 ==  NULL)
         printf("shouldn't happen\n");
+      free_elem(n2);
     }
     hash_elem_t* n = testmap_next(&_map, &ind);
     if(n != NULL)
@@ -155,7 +156,9 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
     st.ResumeTiming();
     for(int i = 0; i < st.range(3); i++)
     {
+      st.PauseTiming();
       curr = get_element();
+      st.ResumeTiming();
       curr->key = i;
 
       testmap_put(&_map, curr);
@@ -177,6 +180,7 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
       hash_elem_t* n2 = testmap_removeindex(&_map, ind);
       if(n == NULL || n2 ==  NULL)
         printf("shouldn't happen\n");
+      free_elem(n2);
     }
     hash_elem_t* n = testmap_next(&_map, &ind);
     if(n != NULL)
@@ -184,7 +188,9 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
     st.ResumeTiming();
     for(int i = 0; i < st.range(3); i++)
     {
+      st.PauseTiming();
       curr = get_element();
+      st.ResumeTiming();
       curr->key = i;
 
       testmap_putindex(&_map, curr, i);
