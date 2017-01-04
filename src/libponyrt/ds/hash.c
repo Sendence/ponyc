@@ -401,14 +401,40 @@ void* ponyint_hashmap_next(hashmap_t* map, size_t* i)
     return NULL;
 
   size_t index = *i + 1;
-  size_t ib_index = index/RT_HASHMAP_BITMAP_TYPE_SIZE;
-  size_t ib_offset = index%RT_HASHMAP_BITMAP_TYPE_SIZE;
+  size_t ib_index = index/HASHMAP_BITMAP_TYPE_SIZE;
+  size_t ib_offset = index%HASHMAP_BITMAP_TYPE_SIZE;
 
   while(index < map->size && ((map->item_bitmap[ib_index] & ((bitmap_t)1 << ib_offset)) == 0))
   {
+    if(ib_offset == 0)
+    {
+      // find first set bit using ffs
+#ifdef PLATFORM_IS_ILP32
+      ib_offset = __pony_ffs(map->item_bitmap[ib_index]);
+#else
+      ib_offset = __pony_ffsl(map->item_bitmap[ib_index]);
+#endif
+
+      // if no bits set; increment by size of item bitmap type and continue
+      if(ib_offset == 0)
+      {
+        index += HASHMAP_BITMAP_TYPE_SIZE;
+        ib_index = index/HASHMAP_BITMAP_TYPE_SIZE;
+        ib_offset = index%HASHMAP_BITMAP_TYPE_SIZE;
+        continue;
+      } else {
+        // found a set bit for valid element
+        index += (ib_offset - 1);
+
+        // no need to check if valid element because item bitmap keeps track of that
+        *i = index;
+        return map->buckets[index];
+      }
+    }
+
     index++;
-    ib_index = index/RT_HASHMAP_BITMAP_TYPE_SIZE;
-    ib_offset = index%RT_HASHMAP_BITMAP_TYPE_SIZE;
+    ib_index = index/HASHMAP_BITMAP_TYPE_SIZE;
+    ib_offset = index%HASHMAP_BITMAP_TYPE_SIZE;
   }
 
   if(index < map->size)
@@ -416,7 +442,7 @@ void* ponyint_hashmap_next(hashmap_t* map, size_t* i)
     // found an element
     // no need to check if valid element because item bitmap keeps track of that
     *i = index;
-    return map->buckets[index].ptr;
+    return map->buckets[index];
   } else {
     // searched through bitmap and didn't find any more valid elements.
     // index will be equal tto size
