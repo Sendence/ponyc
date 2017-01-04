@@ -26,15 +26,10 @@ enum
   FLAG_SYSTEM = 1 << 2,
   FLAG_UNSCHEDULED = 1 << 3,
   FLAG_PENDINGDESTROY = 1 << 4,
-  FLAG_NOISEY = 1 << 5,
+  FLAG_SPECIAL = 1 << 5,
 };
 
 static bool actor_noblock = false;
-
-void set_noisey(pony_actor_t* actor)
-{
-  actor->flags |= FLAG_NOISEY;
-}
 
 static bool has_flag(pony_actor_t* actor, uint8_t flag)
 {
@@ -49,6 +44,16 @@ static void set_flag(pony_actor_t* actor, uint8_t flag)
 static void unset_flag(pony_actor_t* actor, uint8_t flag)
 {
   actor->flags &= (uint8_t)~flag;
+}
+
+void set_special(pony_actor_t* actor)
+{
+  set_flag(actor, FLAG_SPECIAL);
+}
+
+bool is_special(pony_actor_t* actor)
+{
+  return has_flag(actor, FLAG_SPECIAL);
 }
 
 static bool handle_message(pony_ctx_t* ctx, pony_actor_t* actor,
