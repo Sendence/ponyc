@@ -407,86 +407,26 @@ void* ponyint_rt_hashmap_next(rt_hashmap_t* map, size_t* i)
   if(map->count == 0)
     return NULL;
 
-  void* elem = NULL;
   size_t index = *i + 1;
+  size_t ib_index = index/RT_HASHMAP_BITMAP_TYPE_SIZE;
+  size_t ib_offset = index%RT_HASHMAP_BITMAP_TYPE_SIZE;
 
-  // Don't use bitmap scan if the hashmap is too small or if the % items is not large enough
-  // TODO: figure out right heuristic for when to use bitmap or not
-  if((map->size > MIN_RT_HASHMAP_SCAN_SIZE) &&
-    ((map->count << MAX_RT_HASHMAP_SCAN_SHIFT) < map->size))
+  while(index < map->size && ((map->item_bitmap[ib_index] & ((bitmap_t)1 << ib_offset)) == 0))
   {
-    size_t ib_index = 0;
-    size_t ib_offset = 0;
+    index++;
+    ib_index = index/RT_HASHMAP_BITMAP_TYPE_SIZE;
+    ib_offset = index%RT_HASHMAP_BITMAP_TYPE_SIZE;
+  }
 
-    while(index < map->size)
-    {
-      ib_index = index/RT_HASHMAP_BITMAP_TYPE_SIZE;
-      ib_offset = index%RT_HASHMAP_BITMAP_TYPE_SIZE;
-
-      // if we're at the beginning of a new array entry in the item bitmap
-      if(ib_offset == 0)
-      {
-        // find first set bit using ffs
-#ifdef PLATFORM_IS_ILP32
-        ib_offset = __pony_ffs(map->item_bitmap[ib_index]);
-#else
-        ib_offset = __pony_ffsl(map->item_bitmap[ib_index]);
-#endif
-
-        // if no bits set; increment by size of item bitmap type and continue
-        if(ib_offset == 0)
-        {
-          index += RT_HASHMAP_BITMAP_TYPE_SIZE;
-          continue;
-        } else {
-          // found a set bit for valid element
-          index += (ib_offset - 1);
-          elem = map->buckets[index].ptr;
-
-          // no need to check if valid element because item bitmap keeps track of that
-          *i = index;
-          return elem;
-        }
-      } else {
-
-        // in the middle of an item bitmap array entry (can't use ffs optimization
-        // to find first valid element in bitmap araay entry)
-        do {
-          if((map->item_bitmap[ib_index] & ((bitmap_t)1 << ib_offset)) != 0)
-          {
-            // found an element
-            elem = map->buckets[index].ptr;
-
-            // no need to check if valid element because item bitmap keeps track of that
-            *i = index;
-            return elem;
-          } else {
-            index++;
-            ib_offset++;
-          }
-        } while(ib_offset < RT_HASHMAP_BITMAP_TYPE_SIZE);
-      }
-    }
-
-    // searched through bitmap and didn't find any more valid elements.
-    // due to ffs index can be greater than size so set i to size instead
-    // to preserve old behavior
-    *i = map->size;
-    return NULL;
+  if(index < map->size)
+  {
+    // found an element
+    // no need to check if valid element because item bitmap keeps track of that
+    *i = index;
+    return map->buckets[index].ptr;
   } else {
-    while(index < map->size)
-    {
-      elem = map->buckets[index].ptr;
-
-      if(valid(elem))
-      {
-        *i = index;
-        return elem;
-      }
-
-      index++;
-    }
-
+    // searched through bitmap and didn't find any more valid elements.
+    // index will be equal tto size
     *i = index;
     return NULL;
   }
