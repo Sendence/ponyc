@@ -158,7 +158,7 @@ size_t pony_serialise_offset(pony_ctx_t* ctx, void* p)
   return (size_t)t->id | HIGH_BIT;
 }
 
-size_t pony_serialise(pony_ctx_t* ctx, void* p, void* out)
+size_t pony_serialise(pony_ctx_t* ctx, void* p, void* out, size_t offset)
 {
   // This can raise an error.
   assert(ctx->stack == NULL);
@@ -172,7 +172,6 @@ size_t pony_serialise(pony_ctx_t* ctx, void* p, void* out)
   ponyint_array_t* r = (ponyint_array_t*)out;
 
   size_t serialise_size = ctx->serialise_size;
-  size_t offset = r->size;
 
   r->size = r->size + ctx->serialise_size;
   r->alloc = r->size;

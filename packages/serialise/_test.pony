@@ -248,38 +248,38 @@ class iso _TestBuffered is UnitTest
     let buf: Array[U8] ref = Array[U8]
 
     let x: _Simple = _Simple
-    let sx = SerialisedBuffer(serialise, x, buf)
+    let sx = SerialisedBuffer(serialise, x, buf, buf.size())
     let y = sx(deserialise) as _Simple
     h.assert_true(x isnt y)
     h.assert_true(x == y)
 
     let x2: _BoxedWord = _BoxedWord
     x2.f = U64(7)
-    let sx2 = SerialisedBuffer(serialise, x2, buf)
+    let sx2 = SerialisedBuffer(serialise, x2, buf, buf.size())
     let y2 = sx2(deserialise) as _BoxedWord
     h.assert_true(x2 isnt y2)
     h.assert_true((y2.f as U64) == 7)
 
     let x3: Array[U128] = [1, 2, 3]
-    var sx3 = SerialisedBuffer(serialise, x3, buf)
+    var sx3 = SerialisedBuffer(serialise, x3, buf, buf.size())
     let y3 = sx3(deserialise) as Array[U128]
     h.assert_true(x3 isnt y3)
     h.assert_array_eq[U128](x3, y3)
 
     let x4: Array[Bool] = [true, false, true]
-    var sx4 = SerialisedBuffer(serialise, x4, buf)
+    var sx4 = SerialisedBuffer(serialise, x4, buf, buf.size())
     let y4 = sx4(deserialise) as Array[Bool]
     h.assert_true(x4 isnt y4)
     h.assert_array_eq[Bool](x4, y4)
 
     let x5: Array[U32] = [1, 2, 3]
-    var sx5 = SerialisedBuffer(serialise, x5, buf)
+    var sx5 = SerialisedBuffer(serialise, x5, buf, buf.size())
     let y5 = sx5(deserialise) as Array[U32]
     h.assert_true(x5 isnt y5)
     h.assert_array_eq[U32](x5, y5)
 
     let x6: Array[(U16, Bool)] = [(1, true), (2, false), (3, true)]
-    var sx6 = SerialisedBuffer(serialise, x6, buf)
+    var sx6 = SerialisedBuffer(serialise, x6, buf, buf.size())
     let y6 = sx6(deserialise) as Array[(U16, Bool)]
     h.assert_true(x6 isnt y6)
 
@@ -291,14 +291,14 @@ class iso _TestBuffered is UnitTest
     end
 
     let x7: Array[String] = ["hi", "there", "folks"]
-    var sx7 = SerialisedBuffer(serialise, x7, buf)
+    var sx7 = SerialisedBuffer(serialise, x7, buf, buf.size())
     let y7 = sx7(deserialise) as Array[String]
     h.assert_true(x7 isnt y7)
     h.assert_array_eq[String](x7, y7)
 
     let x8: Array[_StructWords] =
       [as _StructWords: _StructWords, _StructWords, _StructWords]
-    var sx8 = SerialisedBuffer(serialise, x8, buf)
+    var sx8 = SerialisedBuffer(serialise, x8, buf, buf.size())
     let y8 = sx8(deserialise) as Array[_StructWords]
     h.assert_true(x8 isnt y8)
 
@@ -310,7 +310,7 @@ class iso _TestBuffered is UnitTest
     end
 
     let x9: Array[U64] = recover Array[U64] end
-    var sx9 = SerialisedBuffer(serialise, x9, buf)
+    var sx9 = SerialisedBuffer(serialise, x9, buf, buf.size())
     let y9 = sx9(deserialise) as Array[U64]
     h.assert_true(x9 isnt y9)
     h.assert_array_eq[U64](x9, y9)

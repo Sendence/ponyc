@@ -72,7 +72,7 @@ class val Serialised
     A caller with SerialiseAuth can create serialised data from any object.
     """
     let r = recover Array[U8] end
-    @pony_serialise[USize](@pony_ctx[Pointer[None]](), data, r) ?
+    @pony_serialise[USize](@pony_ctx[Pointer[None]](), data, r, r.size()) ?
     _data = consume r
 
   new input(auth: InputSerialisedAuth, data: Array[U8] val) =>
@@ -109,13 +109,13 @@ class val SerialisedBuffer
   let _offset: USize
   let _size: USize
 
-  new create(auth: SerialiseAuth, data: Any box, buf: Array[U8] ref) ? =>
+  new create(auth: SerialiseAuth, data: Any box, buf: Array[U8] ref, offset': USize) ? =>
     """
     A caller with SerialiseAuth can create serialised data from any object at
     the end of the buffer they provide. The buffer will be resized if necessary.
     """
-    _offset = buf.size()
-    _size = @pony_serialise[USize](@pony_ctx[Pointer[None]](), data, buf) ?
+    _offset = offset'
+    _size = @pony_serialise[USize](@pony_ctx[Pointer[None]](), data, buf, _offset) ?
     _data = buf
 
   fun apply(auth: DeserialiseAuth): Any iso^ ? =>
