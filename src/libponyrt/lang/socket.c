@@ -482,7 +482,7 @@ static asio_event_t* os_listen(pony_actor_t* owner, int fd,
   }
 
   // Create an event and subscribe it.
-  asio_event_t* ev = pony_asio_event_create(owner, fd, ASIO_READ, 0, true);
+  asio_event_t* ev = pony_asio_event_create(owner, fd, ASIO_READ, 0, true, false);
 
 #ifdef PLATFORM_IS_WINDOWS
   // Start accept for TCP connections, but not for UDP.
@@ -552,7 +552,7 @@ static bool os_connect(pony_actor_t* owner, int fd, struct addrinfo *p,
 
   // Create an event and subscribe it.
   asio_event_t* ev = pony_asio_event_create(owner, fd, ASIO_READ | ASIO_WRITE,
-    0, true);
+    0, true, false);
 
   if(!iocp_connect(ev, p))
   {
@@ -570,10 +570,10 @@ static bool os_connect(pony_actor_t* owner, int fd, struct addrinfo *p,
   }
 #ifdef PLATFORM_IS_LINUX
   // Create an event and subscribe it.
-  pony_asio_event_create(owner, fd, ASIO_READ | ASIO_WRITE | ASIO_ONESHOT, 0, true);
+  pony_asio_event_create(owner, fd, ASIO_READ | ASIO_WRITE | ASIO_ONESHOT, 0, true, true);
 #else
   // Create an event and subscribe it.
-  pony_asio_event_create(owner, fd, ASIO_READ | ASIO_WRITE, 0, true);
+  pony_asio_event_create(owner, fd, ASIO_READ | ASIO_WRITE, 0, true, false);
 #endif
 #endif
 

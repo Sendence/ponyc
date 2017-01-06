@@ -1,5 +1,5 @@
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool)
+  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
@@ -18,7 +18,7 @@ actor SignalHandler
     _notify = consume notify
     _sig = sig
     _event =
-      @pony_asio_event_create(this, 0, AsioEvent.signal(), sig.u64(), false)
+      @pony_asio_event_create(this, 0, AsioEvent.signal(), sig.u64(), false, false)
 
   be raise() =>
     """

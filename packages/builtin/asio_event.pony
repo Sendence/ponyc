@@ -1,3 +1,8 @@
+use @pony_asio_event_get_writeable[Bool](event: AsioEventID)
+use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
+use @pony_asio_event_get_readable[Bool](event: AsioEventID)
+use @pony_asio_event_set_readable[None](event: AsioEventID, readable: Bool)
+
 type AsioEventID is Pointer[AsioEvent] tag
 
 interface tag AsioEventNotify
@@ -12,6 +17,18 @@ primitive AsioEvent
     An empty event.
     """
     AsioEventID
+
+  fun get_readable(ev: AsioEventID): Bool =>
+    @pony_asio_event_get_readable(ev)
+
+  fun set_readable(ev: AsioEventID, readable': Bool) =>
+    @pony_asio_event_set_readable(ev, readable')
+
+  fun get_writeable(ev: AsioEventID): Bool =>
+    @pony_asio_event_get_writeable(ev)
+
+  fun set_writeable(ev: AsioEventID, writeable': Bool) =>
+    @pony_asio_event_set_writeable(ev, writeable')
 
   fun readable(flags: U32): Bool =>
     """

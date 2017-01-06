@@ -21,6 +21,9 @@ typedef struct asio_event_t
   uint32_t flags;       /* event filter flags */
   bool noisy;           /* prevents termination? */
   uint64_t nsec;        /* nanoseconds for timers */
+  bool auto_resub;      /* automagically resubscribe? */
+  bool readable;        /* is fd readable? */
+  bool writeable;       /* is fd writeable? */
 #ifdef PLATFORM_IS_WINDOWS
   HANDLE timer;         /* timer handle */
 #endif
@@ -41,7 +44,7 @@ typedef struct asio_msg_t
  *  based on quiescence.
  */
 asio_event_t* pony_asio_event_create(pony_actor_t* owner, int fd,
-  uint32_t flags, uint64_t nsec, bool noisy);
+  uint32_t flags, uint64_t nsec, bool noisy, bool auto_resub);
 
 /** Deallocates an ASIO event.
  */
@@ -77,6 +80,22 @@ void pony_asio_event_setnsec(asio_event_t* ev, uint64_t nsec);
  *  notifications for I/O events on the corresponding resource.
  */
 void pony_asio_event_unsubscribe(asio_event_t* ev);
+
+/** Get whether FD is writeable or not
+ */
+bool pony_asio_event_get_writeable(asio_event_t* ev);
+
+/** Set whether FD is writeable or not
+ */
+void pony_asio_event_set_writeable(asio_event_t* ev, bool writeable);
+
+/** Get whether FD is readable or not
+ */
+bool pony_asio_event_get_readable(asio_event_t* ev);
+
+/** Get whether FD is readable or not
+ */
+void pony_asio_event_set_readable(asio_event_t* ev, bool readable);
 
 PONY_EXTERN_C_END
 

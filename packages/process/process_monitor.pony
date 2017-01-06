@@ -91,7 +91,7 @@ Document waitpid behaviour (stops world)
 use "files"
 use @pony_os_errno[I32]()
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-      flags: U32, nsec: U64, noisy: Bool)
+      flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
@@ -458,7 +458,7 @@ actor ProcessMonitor
     Takes a file descriptor (one end of a pipe) and returns an AsioEvent.
     """
     ifdef posix then
-      @pony_asio_event_create(this, fd, AsioEvent.read(), 0, true)
+      @pony_asio_event_create(this, fd, AsioEvent.read(), 0, true, false)
     else
       AsioEvent.none()
     end

@@ -2,10 +2,12 @@ use "buffered"
 use "collections"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool)
+  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
+use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
+use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 type TCPConnectionAuth is (AmbientAuth | NetAuth | TCPAuth | TCPConnectAuth)
@@ -238,13 +240,17 @@ actor TCPConnection
     _fd = fd
     ifdef linux then
       _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true)
+        AsioEvent.read_write_oneshot(), 0, true, true)
     else
       _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write(), 0, true)
+        AsioEvent.read_write(), 0, true, true)
     end
     _connected = true
-    _writeable = true
+    ifdef linux then
+      AsioEvent.set_writeable(_event, true)
+    else
+      _writeable = true
+    end
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
@@ -428,7 +434,6 @@ actor TCPConnection
             _fd = fd
             _event = event
             _connected = true
-            _writeable = true
 
             _notify.connected(this)
             _queue_read()
@@ -462,7 +467,9 @@ actor TCPConnection
     else
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
-        _writeable = true
+        ifdef not linux then
+          _writeable = true
+        end
         _complete_writes(arg)
           ifdef not windows then
             if _pending_writes() then
@@ -473,7 +480,9 @@ actor TCPConnection
       end
 
       if AsioEvent.readable(flags) then
-        _readable = true
+        ifdef not linux then
+          _readable = true
+        end
         _complete_reads(arg)
         _pending_reads()
       end
@@ -485,7 +494,6 @@ actor TCPConnection
 
       _try_shutdown()
     end
-    _resubscribe_event()
 
   be _read_again() =>
     """
@@ -572,7 +580,7 @@ actor TCPConnection
       let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
       var num_to_send: USize = 0
       var bytes_to_send: USize = 0
-      while _writeable and (_pending_writev_total > 0) do
+      while ifdef linux then AsioEvent.get_writeable(_event) else _writeable end and (_pending_writev_total > 0) do
         try
           //determine number of bytes and buffers to send
           if (_pending_writev.size()/2) < writev_batch_size then
@@ -702,7 +710,7 @@ actor TCPConnection
         var sum: USize = 0
         var received_called: USize = 0
 
-        while _readable and not _shutdown_peer do
+        while ifdef linux then AsioEvent.get_readable(_event) else _readable end and not _shutdown_peer do
           if _muted then
             return
           end
@@ -716,7 +724,14 @@ actor TCPConnection
           match len
           | 0 =>
             // Would block, try again later.
-            _readable = false
+            ifdef linux then
+              // this is safe because asio thread isn't currently subscribed
+              // for a read event so will not be writing to the readable flag
+              AsioEvent.set_readable(_event, false)
+              @pony_asio_event_resubscribe_read(_event)
+            else
+              _readable = false
+            end
             return
           | _next_size =>
             // Increase the read buffer size.
@@ -849,7 +864,9 @@ actor TCPConnection
       _pending_writev.clear()
       _pending.clear()
       _pending_writev_total = 0
+      AsioEvent.set_readable(_event, false)
       _readable = false
+      AsioEvent.set_writeable(_event, false)
       _writeable = false
     end
 
@@ -864,25 +881,14 @@ actor TCPConnection
   fun ref _apply_backpressure() =>
     ifdef not windows then
       _writeable = false
+      // this is safe because asio thread isn't currently subscribed
+      // for a write event so will not be writing to the readable flag
+      AsioEvent.set_writeable(_event, false)
+      @pony_asio_event_resubscribe_write(_event)
     end
 
     _notify.throttled(this)
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
-
-  fun ref _resubscribe_event() =>
-    ifdef linux then
-      let flags = if not _readable and not _writeable then
-        AsioEvent.read_write_oneshot()
-      elseif not _readable then
-        AsioEvent.read() or AsioEvent.oneshot()
-      elseif not _writeable then
-        AsioEvent.write() or AsioEvent.oneshot()
-      else
-        return
-      end
-
-      @pony_asio_event_resubscribe(_event, flags)
-    end
 
