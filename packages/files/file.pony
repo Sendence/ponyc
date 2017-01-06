@@ -1,3 +1,5 @@
+use "collections"
+
 primitive _FileHandle
 
 primitive FileOK
@@ -15,7 +17,7 @@ primitive _EEXIST
 
 primitive _EACCES
   fun apply(): I32 => 13
-    
+
 type FileErrNo is
   ( FileOK
   | FileError
@@ -60,10 +62,14 @@ class File
   """
   let path: FilePath
   let writeable: Bool
+  let _newline: String = "\n"
+  var _unsynced_data: Bool = false
+  var _unsynced_metadata: Bool = false
   var _fd: I32
-  var _handle: Pointer[_FileHandle]
   var _last_line_length: USize = 256
   var _errno: FileErrNo = FileOK
+  embed _pending_writev: Array[USize] = _pending_writev.create()
+  var _pending_writev_total: USize = 0
 
   new create(from: FilePath) =>
     """
@@ -74,36 +80,29 @@ class File
     path = from
     writeable = true
     _fd = -1
-    _handle = Pointer[_FileHandle]
 
     if not from.caps(FileRead) or not from.caps(FileWrite) then
       _errno = FileError
     else
-      var mode = "x"
-      if not from.exists() then
-        if not from.caps(FileCreate) then
+      var flags: I32 = @ponyint_o_rdwr()
+      let mode = FileMode._os() // default file permissions
+      if not path.exists() then
+        if not path.caps(FileCreate) then
           _errno = FileError
         else
-          mode = "w+b"
+          flags = flags or @ponyint_o_creat() or @ponyint_o_trunc()
         end
-      else
-        mode = "r+b"
       end
 
-      if mode != "x" then
-        _handle = @fopen[Pointer[_FileHandle]](
-          path.path.cstring(), mode.cstring())
+      _fd = @open[I32](path.path.cstring(), flags, mode)
 
-        if _handle.is_null() then
-          _errno = _get_error()
+      if _fd == -1 then
+        _errno = _get_error()
+      else
+        try
+          _FileDes.set_rights(_fd, path, writeable)
         else
-          _fd = _get_fd(_handle)
-
-          try
-            _FileDes.set_rights(_fd, path, writeable)
-          else
-            _errno = FileError
-          end
+          _errno = FileError
         end
       end
     end
@@ -116,12 +115,11 @@ class File
     path = from
     writeable = false
     _fd = -1
-    _handle = Pointer[_FileHandle]
 
     if
-      not from.caps(FileRead) or
+      not path.caps(FileRead) or
       try
-        let info' = FileInfo(from)
+        let info' = FileInfo(path)
         info'.directory or info'.pipe
       else
         true
@@ -129,14 +127,12 @@ class File
     then
       _errno = FileError
     else
-      _handle = @fopen[Pointer[_FileHandle]](
-        from.path.cstring(), "rb".cstring())
+      _fd = @open[I32](
+        path.path.cstring(), @ponyint_o_rdwr())
 
-      if _handle.is_null() then
+      if _fd == -1 then
         _errno = FileError
       else
-        _fd = _get_fd(_handle)
-
         try
           _FileDes.set_rights(_fd, path, writeable)
         else
@@ -157,17 +153,6 @@ class File
     writeable = from.caps(FileRead)
     _fd = fd
 
-    if writeable then
-      _handle = @fdopen[Pointer[_FileHandle]](fd, "r+b".cstring())
-    else
-      _handle = @fdopen[Pointer[_FileHandle]](fd, "rb".cstring())
-    end
-
-    if _handle.is_null() then
-      _errno = _get_error()
-      error
-    end
-
     _FileDes.set_rights(_fd, path, writeable)
 
   fun errno(): FileErrNo =>
@@ -181,23 +166,7 @@ class File
     Clears the last error code set for this File.
     Clears the error indicator for the stream.
     """
-    if not _handle.is_null() then
-      @clearerr[None](_handle)
-    end
     _errno = FileOK
-
-  fun get_stream_error(): FileErrNo =>
-    """
-    Checks for errors after File stream operations.
-    Retrieves errno if ferror is true.
-    """
-    if @feof[I32](_handle) != 0 then
-      return FileEOF
-    end
-    if @ferror[I32](_handle) != 0 then
-      return _get_error()
-    end
-    FileOK
 
   fun _get_error(): FileErrNo =>
     """
@@ -212,19 +181,19 @@ class File
       return FileError
     end
 
-    
+
   fun valid(): Bool =>
     """
     Returns true if the file is currently open.
     """
-    not _handle.is_null()
+    not _fd == -1
 
   fun get_fd(): I32 ? =>
     """
     Returns the underlying file descriptor.
     Raises an error if the file is not currently open.
     """
-    if _handle.is_null() then
+    if _fd == -1 then
       error
     end
 
@@ -233,12 +202,14 @@ class File
   fun ref line(): String iso^ ? =>
     """
     Returns a line as a String. The newline is not included in the string. If
-    there is no more data, this raises an error.
+    there is no more data, this raises an error. If there is a file error,
+    this raises an error.
     """
-    if _handle.is_null() then
+    if _fd == -1 then
       error
     end
 
+    let bytes_to_read: USize = 1
     var offset: USize = 0
     var len = _last_line_length
     var result = recover String end
@@ -247,29 +218,30 @@ class File
     while not done do
       result.reserve(len)
 
-      let r = ifdef linux then
-        @fgets_unlocked[Pointer[U8]](result.cstring().usize() + offset,
-          result.space() - offset, _handle)
-      else
-        @fgets[Pointer[U8]](result.cstring().usize() + offset,
-          result.space() - offset, _handle)
+      let r = @read[ISize](_fd, result.cstring().usize() + offset, bytes_to_read)
+
+      if r < bytes_to_read.isize() then
+        _errno = if r == 0 then
+                   FileEOF
+                 else
+                   _get_error() // error
+                   error
+                 end
       end
 
       result.recalc()
 
-      if r.is_null() then
-        _errno = get_stream_error() // either EOF or error
-      end
-      
       done = try
-        r.is_null() or (result.at_offset(-1) == '\n')
+        (_errno is FileEOF) or (result.at_offset(offset.isize()) == '\n')
       else
         true
       end
 
-      if not done then
-        offset = result.size()
-        len = len * 2
+      if (not done) then
+        offset = offset + 1
+        if offset == len then
+          len = len * 2
+        end
       end
     end
 
@@ -278,7 +250,7 @@ class File
     end
 
     try
-      if result.at_offset(-1) == '\n' then
+      if result.at_offset(offset.isize()) == '\n' then
         result.truncate(result.size() - 1)
 
         if result.at_offset(-1) == '\r' then
@@ -294,20 +266,20 @@ class File
     """
     Returns up to len bytes.
     """
-    if not _handle.is_null() then
+    if _fd != -1 then
       let result = recover Array[U8].undefined(len) end
 
-      let r = ifdef linux then
-        @fread_unlocked[USize](result.cpointer(), USize(1), len, _handle)
-      else
-        @fread[USize](result.cpointer(), USize(1), len, _handle)
+      let r = @read[ISize](_fd, result.cpointer(), len)
+
+      if r < len.isize() then
+        _errno = if r == 0 then
+                   FileEOF
+                 else
+                   _get_error() // error
+                 end
       end
 
-      if r < len then
-        _errno = get_stream_error() // EOF or error
-      end 
-      
-      result.truncate(r)
+      result.truncate(r.usize())
       result
     else
       recover Array[U8] end
@@ -318,21 +290,20 @@ class File
     Returns up to len bytes. The resulting string may have internal null
     characters.
     """
-    if not _handle.is_null() then
+    if _fd != -1 then
       let result = recover String(len) end
 
-      let r = ifdef linux then
-        @fread_unlocked[USize](result.cstring(), USize(1), result.space(),
-          _handle)
-      else
-        @fread[USize](result.cstring(), USize(1), result.space(), _handle)
+      let r = @read[ISize](_fd, result.cstring(), result.space())
+
+      if r < len.isize() then
+        _errno = if r == 0 then
+                   FileEOF
+                 else
+                   _get_error() // error
+                 end
       end
 
-      if r < len then
-        _errno = get_stream_error() // EOF or error
-      end 
-      
-      result.truncate(r)
+      result.truncate(r.usize())
       result
     else
       recover String end
@@ -342,66 +313,132 @@ class File
     """
     Same as write, buts adds a newline.
     """
-    write(data) and write("\n")
+    _pending_writev.push(data.cpointer().usize()).push(data.size())
+    _pending_writev_total = _pending_writev_total + data.size()
+
+    _pending_writev.push(_newline.cpointer().usize()).push(_newline.size())
+    _pending_writev_total = _pending_writev_total + _newline.size()
+
+    _pending_writes()
 
   fun ref printv(data: ByteSeqIter box): Bool =>
     """
     Print an iterable collection of ByteSeqs.
     """
     for bytes in data.values() do
-      if not print(bytes) then
-        return false
-      end
+      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+      _pending_writev_total = _pending_writev_total + bytes.size()
+
+      _pending_writev.push(_newline.cpointer().usize()).push(_newline.size())
+      _pending_writev_total = _pending_writev_total + _newline.size()
     end
-    true
+
+    _pending_writes()
 
   fun ref write(data: ByteSeq box): Bool =>
     """
     Returns false if the file wasn't opened with write permission.
     Returns false and closes the file if not all the bytes were written.
     """
-    if writeable and (not _handle.is_null()) then
-      let len = ifdef linux then
-        @fwrite_unlocked[USize](data.cpointer(), USize(1), data.size(), _handle)
-      else
-        @fwrite[USize](data.cpointer(), USize(1), data.size(), _handle)
-      end
+    _pending_writev.push(data.cpointer().usize()).push(data.size())
+    _pending_writev_total = _pending_writev_total + data.size()
 
-      if len == data.size() then
-        return true
-      end
-      // check error
-      _errno = get_stream_error()
-      // fwrite can't resume in case of error
-      dispose()
-    end
-    false
+    _pending_writes()
 
   fun ref writev(data: ByteSeqIter box): Bool =>
     """
     Write an iterable collection of ByteSeqs.
     """
     for bytes in data.values() do
-      if not write(bytes) then
+      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+      _pending_writev_total = _pending_writev_total + bytes.size()
+    end
+
+    _pending_writes()
+
+  fun ref _pending_writes(): Bool =>
+    """
+    Write pending data.
+    Returns false if the file wasn't opened with write permission.
+    Returns false and closes the file and discards all pending data
+    if not all the bytes were written.
+    Returns true if it sent all pending data.
+    """
+    // TODO: Make writev_batch_size user configurable
+    let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
+    var num_to_send: USize = 0
+    var bytes_to_send: USize = 0
+    while writeable and (_pending_writev_total > 0)
+      and (_fd != -1) do
+      try
+        //determine number of bytes and buffers to send
+        if (_pending_writev.size()/2) < writev_batch_size then
+          num_to_send = _pending_writev.size()/2
+          bytes_to_send = _pending_writev_total
+        else
+          //have more buffers than a single writev can handle
+          //iterate over buffers being sent to add up total
+          num_to_send = writev_batch_size
+          bytes_to_send = 0
+          for d in Range[USize](1, num_to_send*2, 2) do
+            bytes_to_send = bytes_to_send + _pending_writev(d)
+          end
+        end
+
+        // Write as much data as possible.
+        var len = @writev[ISize](_fd,
+          _pending_writev.cpointer(), num_to_send)
+
+        if len < bytes_to_send.isize() then
+          // sent less than requested
+          // TODO: error recovery? EINTR?
+
+          // check error
+          _errno = _get_error()
+
+          dispose()
+          return false
+        else
+          // sent all data we requested in this batch
+          _pending_writev_total = _pending_writev_total - bytes_to_send
+          if _pending_writev_total == 0 then
+            _pending_writev.clear()
+            _unsynced_data = true
+            _unsynced_metadata = true
+            return true
+          else
+            for d in Range[USize](0, num_to_send, 1) do
+              _pending_writev.shift()
+              _pending_writev.shift()
+            end
+          end
+        end
+      else
+        // TODO: error recovery?
+
+        // check error
+        _errno = _get_error()
+
+        dispose()
         return false
       end
     end
-    true
+
+    false
 
   fun ref position(): USize =>
     """
     Return the current cursor position in the file.
     """
-    if not _handle.is_null() then
-      let r = ifdef windows then
-        @_ftelli64[U64](_handle).usize()
-      else
-        @ftell[USize](_handle)
-      end
+    if _fd != -1 then
+      let o: ISize = 0
+      let b: I32 = 1
+      let r = @lseek[I32](_fd, o, b)
+
       if r < 0 then
         _errno = _get_error()
       end
-      r
+      r.usize()
     else
       0
     end
@@ -443,45 +480,38 @@ class File
     end
     this
 
-  fun ref flush(): File =>
-    """
-    Flush the file.
-    """
-    if not _handle.is_null() then
-      let r = ifdef linux then
-        @fflush_unlocked[I32](_handle)
-      else
-        @fflush[I32](_handle)
-      end
-      if r != 0 then
-        _errno = _get_error()
-      end
-    end
-    this
-
   fun ref sync(): File =>
     """
     Sync the file contents to physical storage.
     """
-    if path.caps(FileSync) and not _handle.is_null() then
-      ifdef windows then
-        let h = @_get_osfhandle[U64](_fd)
-        @FlushFileBuffers[I32](h)
-      else
-        let r = @fsync[I32](_fd)
-        if r < 0 then
-          _errno = _get_error()
-        end
+    if path.caps(FileSync) and (_fd != -1) then
+      let r = @fsync[I32](_fd)
+      if r < 0 then
+        _errno = _get_error()
       end
     end
+    _unsynced_data = false
+    _unsynced_metadata = false
+    this
+
+  fun ref datasync(): File =>
+    """
+    Sync the file contents to physical storage.
+    """
+    if path.caps(FileSync) and (_fd != -1) then
+      let r = @fdatasync[I32](_fd)
+      if r < 0 then
+        _errno = _get_error()
+      end
+    end
+    _unsynced_data = false
     this
 
   fun ref set_length(len: USize): Bool =>
     """
     Change the file size. If it is made larger, the new contents are undefined.
     """
-    if path.caps(FileTruncate) and writeable and (not _handle.is_null()) then
-      flush()
+    if path.caps(FileTruncate) and writeable and (_fd != -1) then
       let pos = position()
       let result = ifdef windows then
         @_chsize_s[I32](_fd, len)
@@ -492,7 +522,7 @@ class File
       if pos >= len then
         _seek(0, 2)
       end
-      
+
       if result == 0 then
         true
       else
@@ -545,47 +575,46 @@ class File
     """
     Close the file. Future operations will do nothing.
     """
-    if not _handle.is_null() then
-      @fclose[I32](_handle)
-      _handle = Pointer[_FileHandle]
+    if _fd != -1 then
+      if _unsynced_data or _unsynced_metadata then
+        sync()
+      end
+      let r = @close[I32](_fd)
+      if r < 0 then
+        _errno = _get_error()
+      end
       _fd = -1
+
+      _pending_writev_total = 0
+      _pending_writev.clear()
     end
 
   fun ref _seek(offset: ISize, base: I32) =>
     """
     Move the cursor position.
     """
-    if not _handle.is_null() then
-      ifdef windows then
-        @_fseeki64[I32](_handle, offset, base)
-      else
-        let r = @fseek[I32](_handle, offset, base)
-        if r < 0 then
-          _errno = _get_error()
-        end
+    if _fd != -1 then
+      let r = @lseek[I32](_fd, offset, base)
+      if r < 0 then
+        _errno = _get_error()
       end
-    end
-
-  fun tag _get_fd(handle: Pointer[_FileHandle]): I32 =>
-    """
-    Get the file descriptor associated with the file handle.
-    """
-    if not handle.is_null() then
-      ifdef windows then
-        @_fileno[I32](handle)
-      else
-        @fileno[I32](handle)
-      end
-    else
-      -1
     end
 
   fun _final() =>
     """
     Close the file.
     """
-    if not _handle.is_null() then
-      @fclose[I32](_handle)
+    // TODO: How to handle errors on sync/close?
+    if _fd != -1 then
+      if _unsynced_data or _unsynced_metadata then
+        // TODO: Can't check for FileSync in `_final`
+        //       what to do instead for unsync'd data?
+//        if path.caps(FileSync) then
+//          @fsync[I32](_fd)
+          None
+//        end
+      end
+      @close[I32](_fd)
     end
 
 class FileLines is Iterator[String]

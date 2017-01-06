@@ -35,8 +35,6 @@ asio_event_t* pony_asio_event_create(pony_actor_t* owner, int fd,
 
   pony_asio_event_subscribe(ev);
 
-  set_noisey(owner);
-
   return ev;
 }
 
