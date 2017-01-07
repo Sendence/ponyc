@@ -25,7 +25,15 @@ enum
   FLAG_SYSTEM = 1 << 2,
   FLAG_UNSCHEDULED = 1 << 3,
   FLAG_PENDINGDESTROY = 1 << 4,
-  FLAG_SPECIAL = 1 << 5,
+};
+
+enum
+{
+  FLAG_SPECIAL = 1 << 1,
+  FLAG_SOURCE = 1 << 2,
+  FLAG_SINK = 1 << 3,
+  FLAG_STEP = 1 << 4,
+  FLAG_METRICS_SINK = 1 << 5,
 };
 
 static bool actor_noblock = false;
@@ -45,14 +53,64 @@ static void unset_flag(pony_actor_t* actor, uint8_t flag)
   actor->flags &= (uint8_t)~flag;
 }
 
+static bool is_type(pony_actor_t* actor, uint8_t type)
+{
+  return (actor->wtype & type) != 0;
+}
+
+static void set_type(pony_actor_t* actor, uint8_t type)
+{
+  actor->wtype |= type;
+}
+
 void set_special(pony_actor_t* actor)
 {
-  set_flag(actor, FLAG_SPECIAL);
+  set_type(actor, FLAG_SPECIAL);
 }
 
 bool is_special(pony_actor_t* actor)
 {
-  return has_flag(actor, FLAG_SPECIAL);
+  return is_type(actor, FLAG_SPECIAL);
+}
+
+void set_source(pony_actor_t* actor)
+{
+  set_type(actor, FLAG_SOURCE);
+}
+
+bool is_source(pony_actor_t* actor)
+{
+  return is_type(actor, FLAG_SOURCE);
+}
+
+void set_sink(pony_actor_t* actor)
+{
+  set_type(actor, FLAG_SINK);
+}
+
+bool is_sink(pony_actor_t* actor)
+{
+  return is_type(actor, FLAG_SINK);
+}
+
+void set_step(pony_actor_t* actor)
+{
+  set_type(actor, FLAG_STEP);
+}
+
+bool is_step(pony_actor_t* actor)
+{
+  return is_type(actor, FLAG_STEP);
+}
+
+void set_metrics_sink(pony_actor_t* actor)
+{
+  set_type(actor, FLAG_METRICS_SINK);
+}
+
+bool is_metrics_sink(pony_actor_t* actor)
+{
+  return is_type(actor, FLAG_METRICS_SINK);
 }
 
 static bool handle_message(pony_ctx_t* ctx, pony_actor_t* actor,
