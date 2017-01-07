@@ -288,6 +288,9 @@ static void run(scheduler_t* sched)
 
     // Run the current actor and get the next actor.
     bool reschedule = ponyint_actor_run(&sched->ctx, actor, actor->batch);
+
+    if(is_source(actor)) continue;
+
     pony_actor_t* next = pop_global(sched);
 
     if(reschedule)
