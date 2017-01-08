@@ -290,7 +290,7 @@ static void run(scheduler_t* sched)
     // Run the current actor and get the next actor.
     bool reschedule = ponyint_actor_run(&sched->ctx, actor, actor->batch);
 
-    if(is_source(actor)) continue;
+    //if(is_source(actor)) continue;
 
     pony_actor_t* next = pop_global(sched);
 
@@ -300,7 +300,7 @@ static void run(scheduler_t* sched)
       {
         // If we have a next actor, we go on the back of the queue. Otherwise,
         // we continue to run this actor.
-        push(sched, actor);
+          push(sched, actor);
         DTRACE2(ACTOR_DESCHEDULED, (uintptr_t)sched, (uintptr_t)actor);
         actor = next;
         DTRACE2(ACTOR_SCHEDULED, (uintptr_t)sched, (uintptr_t)actor);
