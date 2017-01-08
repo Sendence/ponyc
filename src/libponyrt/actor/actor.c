@@ -60,6 +60,7 @@ static bool is_type(pony_actor_t* actor, uint8_t type)
 
 static void set_type(pony_actor_t* actor, uint8_t type)
 {
+  actor->wtype &= (uint8_t)~type;
   actor->wtype |= type;
 }
 
