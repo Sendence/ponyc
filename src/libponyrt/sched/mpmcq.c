@@ -98,4 +98,3 @@ void* ponyint_mpmcq_pop(mpmcq_t* q)
   POOL_FREE(mpmcq_node_t, cmp.node);
   return data;
 }
-
