@@ -56,8 +56,9 @@ static pony_actor_t* pop_global(scheduler_t* sched)
 {
   // The global queue is empty most of the time. We use pop_bailout_immediate
   // to avoid unnecessary synchronisation in that common case.
-  pony_actor_t* actor =
-    (pony_actor_t*)ponyint_mpmcq_pop_bailout_immediate(&inject);
+  //pony_actor_t* actor =
+  //  (pony_actor_t*)ponyint_mpmcq_pop_bailout_immediate(&inject);
+  pony_actor_t* actor = (pony_actor_t*)ponyint_mpmcq_pop(&inject);
 
   if(actor != NULL)
     return actor;
