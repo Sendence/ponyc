@@ -170,7 +170,6 @@ actor TCPConnection
 
   var _next_size: USize
   let _max_size: USize
-  let _max_read: USize
 
   var _read_len: USize = 0
   var _expect: USize = 0
@@ -187,8 +186,7 @@ actor TCPConnection
     """
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
-    _max_read = 16_384
+    _max_size = max_size
     _notify = consume notify
     _connect_count = @pony_os_connect_tcp[U32](this,
       host.cstring(), service.cstring(),
@@ -204,8 +202,7 @@ actor TCPConnection
     """
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
-    _max_read = 16_384
+    _max_size = max_size
     _notify = consume notify
     _connect_count = @pony_os_connect_tcp4[U32](this,
       host.cstring(), service.cstring(),
@@ -221,8 +218,7 @@ actor TCPConnection
     """
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
-    _max_read = 16_384
+    _max_size = max_size
     _notify = consume notify
     _connect_count = @pony_os_connect_tcp6[U32](this,
       host.cstring(), service.cstring(),
@@ -250,8 +246,7 @@ actor TCPConnection
     _writeable = true
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
-    _max_read = 16_384
+    _max_size = max_size
 
     _notify.accepted(this)
     _queue_read()
@@ -719,7 +714,7 @@ actor TCPConnection
             return
           | _next_size =>
             // Increase the read buffer size.
-            _next_size = _max_read.min(_next_size * 2)
+            _next_size = _max_size.min(_next_size * 2)
           end
 
           _read_len = _read_len + len
