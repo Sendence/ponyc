@@ -69,7 +69,9 @@ class SSLConnection is TCPConnectionNotify
 
   recover val Array[ByteSeq] end
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
     """
     Pass the data to the SSL session and check for both new application data
     and new destination data.
@@ -133,11 +135,13 @@ class SSLConnection is TCPConnectionNotify
     end
 
     try
+      var received_calls: USize = 0
       while true do
         let r = _ssl.read(_expect)
 
         if r isnt None then
-          _notify.received(conn, (consume r) as Array[U8] iso^)
+          received_calls = received_calls + 1
+          _notify.received(conn, (consume r) as Array[U8] iso^, received_calls)
         else
           break
         end
