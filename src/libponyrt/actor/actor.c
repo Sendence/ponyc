@@ -163,7 +163,6 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
   try_gc(ctx, actor);
 
   if(apps == batch) {
-    actor->batch += INCR_BATCH;
     return !has_flag(actor, FLAG_UNSCHEDULED);
   }
 
