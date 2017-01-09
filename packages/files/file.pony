@@ -227,9 +227,11 @@ class File
                    _get_error() // error
                    error
                  end
+      else
+        // truncate at offset in order to adjust size of string after ffi call
+        // and to avoid scanning full array via recalc
+        result.truncate(offset + 1)
       end
-
-      result.recalc()
 
       done = try
         (_errno is FileEOF) or (result.at_offset(offset.isize()) == '\n')
@@ -251,7 +253,9 @@ class File
 
     try
       if result.at_offset(offset.isize()) == '\n' then
-        result.truncate(result.size() - 1)
+        // can't rely on result.size because recalc might find an errant
+        // null terminator in the uninitialized memory.
+        result.truncate(offset)
 
         if result.at_offset(-1) == '\r' then
           result.truncate(result.size() - 1)
@@ -313,11 +317,8 @@ class File
     """
     Same as write, buts adds a newline.
     """
-    _pending_writev.push(data.cpointer().usize()).push(data.size())
-    _pending_writev_total = _pending_writev_total + data.size()
-
-    _pending_writev.push(_newline.cpointer().usize()).push(_newline.size())
-    _pending_writev_total = _pending_writev_total + _newline.size()
+    queue(data)
+    queue(_newline)
 
     _pending_writes()
 
@@ -326,11 +327,8 @@ class File
     Print an iterable collection of ByteSeqs.
     """
     for bytes in data.values() do
-      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
-      _pending_writev_total = _pending_writev_total + bytes.size()
-
-      _pending_writev.push(_newline.cpointer().usize()).push(_newline.size())
-      _pending_writev_total = _pending_writev_total + _newline.size()
+      queue(bytes)
+      queue(_newline)
     end
 
     _pending_writes()
@@ -340,8 +338,7 @@ class File
     Returns false if the file wasn't opened with write permission.
     Returns false and closes the file if not all the bytes were written.
     """
-    _pending_writev.push(data.cpointer().usize()).push(data.size())
-    _pending_writev_total = _pending_writev_total + data.size()
+    queue(data)
 
     _pending_writes()
 
@@ -350,11 +347,29 @@ class File
     Write an iterable collection of ByteSeqs.
     """
     for bytes in data.values() do
-      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
-      _pending_writev_total = _pending_writev_total + bytes.size()
+      queue(bytes)
     end
 
     _pending_writes()
+
+  fun ref queue(data: ByteSeq box) =>
+    """
+    Queue data to be written
+    NOTE: Queue'd data will always be written before normal print/write
+    requested data
+    """
+    _pending_writev.push(data.cpointer().usize()).push(data.size())
+    _pending_writev_total = _pending_writev_total + data.size()
+
+  fun ref queuev(data: ByteSeqIter box) =>
+    """
+    Queue an iterable collection of ByteSeqs to be written
+    NOTE: Queue'd data will always be written before normal print/write
+    requested data
+    """
+    for bytes in data.values() do
+      queue(bytes)
+    end
 
   fun ref _pending_writes(): Bool =>
     """
