@@ -25,7 +25,6 @@ typedef struct pony_ctx_t
   trace_actor_fn trace_actor;
   gcstack_t* stack;
   actormap_t acquire;
-  bool finalising;
 
   void* serialise_buffer;
   size_t serialise_size;
