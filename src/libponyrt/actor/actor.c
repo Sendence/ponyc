@@ -235,6 +235,13 @@ bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch)
   // Tell the cycle detector we are blocking. We may not actually block if a
   // message is received between now and when we try to mark our queue as
   // empty, but that's ok, we have still logically blocked.
+  if(!has_flag(actor, FLAG_BLOCKED | FLAG_SYSTEM) ||
+    has_flag(actor, FLAG_RC_CHANGED))
+  {
+    set_flag(actor, FLAG_BLOCKED);
+    unset_flag(actor, FLAG_RC_CHANGED);
+    ponyint_cycle_block(ctx, actor, &actor->gc);
+  }
 
   // Return true (i.e. reschedule immediately) if our queue isn't empty.
   return !ponyint_messageq_markempty(&actor->q);
@@ -297,7 +304,7 @@ void ponyint_actor_final(pony_ctx_t* ctx, pony_actor_t* actor)
     actor->type->final(actor);
 
   // Run all outstanding object finalisers.
-  ponyint_gc_final(ctx, &actor->gc);
+  ponyint_heap_final(&actor->heap);
 
   // Restore the current actor.
   ctx->current = prev;
@@ -418,36 +425,35 @@ void* pony_alloc(pony_ctx_t* ctx, size_t size)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
 
-  return ponyint_heap_alloc(ctx->current, &ctx->current->heap, size);
+  return ponyint_heap_alloc(ctx->current, &ctx->current->heap, size, NULL);
 }
 
 void* pony_alloc_small(pony_ctx_t* ctx, uint32_t sizeclass)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, HEAP_MIN << sizeclass);
 
-  return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass);
+  return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass, NULL);
 }
 
 void* pony_alloc_large(pony_ctx_t* ctx, size_t size)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
 
-  return ponyint_heap_alloc_large(ctx->current, &ctx->current->heap, size);
+  return ponyint_heap_alloc_large(ctx->current, &ctx->current->heap, size, NULL);
 }
 
 void* pony_realloc(pony_ctx_t* ctx, void* p, size_t size)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
 
-  return ponyint_heap_realloc(ctx->current, &ctx->current->heap, p, size);
+  return ponyint_heap_realloc(ctx->current, &ctx->current->heap, p, size, NULL);
 }
 
 void* pony_alloc_final(pony_ctx_t* ctx, size_t size, pony_final_fn final)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
 
-  void* p = ponyint_heap_alloc(ctx->current, &ctx->current->heap, size);
-  ponyint_gc_register_final(ctx, p, final);
+  void* p = ponyint_heap_alloc(ctx->current, &ctx->current->heap, size, final);
   return p;
 }
 
