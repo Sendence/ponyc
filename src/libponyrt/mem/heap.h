@@ -41,21 +41,21 @@ void ponyint_heap_final(heap_t* heap);
 
 __pony_spec_malloc__(
   void* ponyint_heap_alloc(pony_actor_t* actor, heap_t* heap, size_t size,
-  pony_final_fn final)
+  bool has_finaliser)
   );
 
 __pony_spec_malloc__(
 void* ponyint_heap_alloc_small(pony_actor_t* actor, heap_t* heap,
-  uint32_t sizeclass, pony_final_fn final)
+  uint32_t sizeclass, bool has_finaliser)
   );
 
 __pony_spec_malloc__(
 void* ponyint_heap_alloc_large(pony_actor_t* actor, heap_t* heap, size_t size,
-  pony_final_fn final)
+  bool has_finaliser)
   );
 
 void* ponyint_heap_realloc(pony_actor_t* actor, heap_t* heap, void* p,
-  size_t size, pony_final_fn final);
+  size_t size, bool has_finaliser);
 
 /**
  * Adds to the used memory figure kept by the heap. This allows objects

@@ -292,20 +292,21 @@ void ponyint_heap_final(heap_t* heap)
 }
 
 void* ponyint_heap_alloc(pony_actor_t* actor, heap_t* heap, size_t size,
-  pony_final_fn final)
+  bool has_finaliser)
 {
   if(size == 0)
   {
     return NULL;
   } else if(size <= HEAP_MAX) {
-    return ponyint_heap_alloc_small(actor, heap, ponyint_heap_index(size), final);
+    return ponyint_heap_alloc_small(actor, heap, ponyint_heap_index(size),
+      has_finaliser);
   } else {
-    return ponyint_heap_alloc_large(actor, heap, size, final);
+    return ponyint_heap_alloc_large(actor, heap, size, has_finaliser);
   }
 }
 
 void* ponyint_heap_alloc_small(pony_actor_t* actor, heap_t* heap,
-  uint32_t sizeclass, pony_final_fn final)
+  uint32_t sizeclass, bool has_finaliser)
 {
   chunk_t* chunk = heap->small_free[sizeclass];
   void* m;
@@ -322,7 +323,7 @@ void* ponyint_heap_alloc_small(pony_actor_t* actor, heap_t* heap,
     chunk->slots = slots;
 
     // note that a finaliser needs to run
-    if(final != NULL)
+    if(has_finaliser)
       chunk->finalisers |= (1 << bit);
 
     if(slots == 0)
@@ -338,7 +339,7 @@ void* ponyint_heap_alloc_small(pony_actor_t* actor, heap_t* heap,
     n->size = sizeclass;
 
     // note that a finaliser needs to run
-    if(final != NULL)
+    if(has_finaliser)
       n->finalisers = 1;
     else
       n->finalisers = 0;
@@ -361,7 +362,7 @@ void* ponyint_heap_alloc_small(pony_actor_t* actor, heap_t* heap,
 }
 
 void* ponyint_heap_alloc_large(pony_actor_t* actor, heap_t* heap, size_t size,
-  pony_final_fn final)
+  bool has_finaliser)
 {
   size = ponyint_pool_adjust_size(size);
 
@@ -373,7 +374,7 @@ void* ponyint_heap_alloc_large(pony_actor_t* actor, heap_t* heap, size_t size,
   chunk->shallow = 0;
 
   // note that a finaliser needs to run
-  if(final != NULL)
+  if(has_finaliser)
     chunk->finalisers = 1;
   else
     chunk->finalisers = 0;
@@ -388,17 +389,17 @@ void* ponyint_heap_alloc_large(pony_actor_t* actor, heap_t* heap, size_t size,
 }
 
 void* ponyint_heap_realloc(pony_actor_t* actor, heap_t* heap, void* p,
-  size_t size, pony_final_fn final)
+  size_t size, bool has_finaliser)
 {
   if(p == NULL)
-    return ponyint_heap_alloc(actor, heap, size, final);
+    return ponyint_heap_alloc(actor, heap, size, has_finaliser);
 
   chunk_t* chunk = (chunk_t*)ponyint_pagemap_get(p);
 
   if(chunk == NULL)
   {
     // Get new memory and copy from the old memory.
-    void* q = ponyint_heap_alloc(actor, heap, size, final);
+    void* q = ponyint_heap_alloc(actor, heap, size, has_finaliser);
     memcpy(q, p, size);
     return q;
   }
@@ -443,7 +444,7 @@ void* ponyint_heap_realloc(pony_actor_t* actor, heap_t* heap, void* p,
     oldsize = size;
 
   // Get new memory and copy from the old memory.
-  void* q = ponyint_heap_alloc(actor, heap, size, final);
+  void* q = ponyint_heap_alloc(actor, heap, size, has_finaliser);
   memcpy(q, p, oldsize);
   return q;
 }
