@@ -13,7 +13,7 @@ TEST(Heap, Init)
   heap_t heap;
   ponyint_heap_init(&heap);
 
-  void* p = ponyint_heap_alloc(actor, &heap, 127, NULL);
+  void* p = ponyint_heap_alloc(actor, &heap, 127, false);
   ASSERT_EQ((size_t)128, heap.used);
 
   chunk_t* chunk = (chunk_t*)ponyint_pagemap_get(p);
@@ -22,7 +22,7 @@ TEST(Heap, Init)
   size_t size = ponyint_heap_size(chunk);
   ASSERT_EQ(size, (size_t)128);
 
-  void* p2 = ponyint_heap_alloc(actor, &heap, 99, NULL);
+  void* p2 = ponyint_heap_alloc(actor, &heap, 99, false);
   ASSERT_NE(p, p2);
   ASSERT_EQ((size_t)256, heap.used);
 
@@ -32,7 +32,7 @@ TEST(Heap, Init)
   ponyint_heap_endgc(&heap);
   ASSERT_EQ((size_t)128, heap.used);
 
-  void* p3 = ponyint_heap_alloc(actor, &heap, 107, NULL);
+  void* p3 = ponyint_heap_alloc(actor, &heap, 107, false);
   ASSERT_EQ(p2, p3);
 
   ponyint_heap_used(&heap, 1024);
@@ -44,11 +44,11 @@ TEST(Heap, Init)
   ponyint_heap_endgc(&heap);
   ASSERT_EQ((size_t)128, heap.used);
 
-  void* p4 = ponyint_heap_alloc(actor, &heap, 67, NULL);
+  void* p4 = ponyint_heap_alloc(actor, &heap, 67, false);
   ASSERT_EQ(p, p4);
 
   size_t large_size = (1 << 15) - 7;
-  void* p5 = ponyint_heap_alloc(actor, &heap, large_size, NULL);
+  void* p5 = ponyint_heap_alloc(actor, &heap, large_size, false);
   chunk_t* chunk5 = (chunk_t*)ponyint_pagemap_get(p5);
   ASSERT_EQ(actor, ponyint_heap_owner(chunk5));
 

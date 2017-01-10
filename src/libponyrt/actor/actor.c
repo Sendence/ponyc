@@ -425,36 +425,56 @@ void* pony_alloc(pony_ctx_t* ctx, size_t size)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
 
-  return ponyint_heap_alloc(ctx->current, &ctx->current->heap, size, NULL);
+  return ponyint_heap_alloc(ctx->current, &ctx->current->heap, size, false);
 }
 
 void* pony_alloc_small(pony_ctx_t* ctx, uint32_t sizeclass)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, HEAP_MIN << sizeclass);
 
-  return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass, NULL);
+  return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass,
+    false);
 }
 
 void* pony_alloc_large(pony_ctx_t* ctx, size_t size)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
 
-  return ponyint_heap_alloc_large(ctx->current, &ctx->current->heap, size, NULL);
+  return ponyint_heap_alloc_large(ctx->current, &ctx->current->heap, size,
+    false);
 }
 
 void* pony_realloc(pony_ctx_t* ctx, void* p, size_t size)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
 
-  return ponyint_heap_realloc(ctx->current, &ctx->current->heap, p, size, NULL);
+  return ponyint_heap_realloc(ctx->current, &ctx->current->heap, p, size,
+    false);
 }
 
-void* pony_alloc_final(pony_ctx_t* ctx, size_t size, pony_final_fn final)
+void* pony_alloc_final(pony_ctx_t* ctx, size_t size)
 {
   DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
 
-  void* p = ponyint_heap_alloc(ctx->current, &ctx->current->heap, size, final);
+  void* p = ponyint_heap_alloc(ctx->current, &ctx->current->heap, size,
+    true);
   return p;
+}
+
+void* pony_alloc_small_final(pony_ctx_t* ctx, uint32_t sizeclass)
+{
+  DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, HEAP_MIN << sizeclass);
+
+  return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass,
+    true);
+}
+
+void* pony_alloc_large_final(pony_ctx_t* ctx, size_t size)
+{
+  DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
+
+  return ponyint_heap_alloc_large(ctx->current, &ctx->current->heap, size,
+    true);
 }
 
 void pony_triggergc(pony_actor_t* actor)
