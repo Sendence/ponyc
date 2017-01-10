@@ -907,7 +907,7 @@ static void optimise(compile_t* c, bool pony_specific)
     if(c->opt->verbosity >= VERBOSITY_MINIMAL)
       fprintf(stderr, "Optimising\n");
 
-    pmb.OptLevel = 3;
+    pmb.OptLevel = 0;
     pmb.Inliner = createFunctionInliningPass(275);
     pmb.MergeFunctions = true;
   } else {
