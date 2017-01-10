@@ -203,10 +203,6 @@ class iso _TestFailures is UnitTest
     let serialise = SerialiseAuth(ambient)
 
     h.assert_error({()(serialise)? =>
-      Serialised(serialise, _HasPointer)
-    })
-
-    h.assert_error({()(serialise)? =>
       Serialised(serialise, _HasActor)
     })
 
