@@ -89,10 +89,10 @@ static void serialise(compile_t* c, reach_type_t* t, LLVMValueRef ctx,
     size_t buf_size = 2 * sizeof(void *);
     LLVMTypeRef* params = (LLVMTypeRef*)ponyint_pool_alloc_size(buf_size);
     LLVMGetParamTypes(f_type, params);
-    
+
     args[0] = LLVMBuildBitCast(c->builder, object, params[0], "");
     args[1] = LLVMBuildBitCast(c->builder, f_offset, params[1], "");
-    LLVMBuildCall(c->builder, t->custom_serialise_fn, args, 2, "");
+    codegen_call(c, t->custom_serialise_fn, args, 2);
 
     ponyint_pool_free_size(buf_size, params);
   }

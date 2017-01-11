@@ -269,6 +269,7 @@ void* pony_deserialise_offset(pony_ctx_t* ctx, pony_type_t* t,
 
   // didn't find it in the map but index is where we can put the
   // new one without another search
+  s->t = t;
   ponyint_serialise_putindex(&ctx->serialise, s, index);
 
   recurse(ctx, object, t->deserialise);
