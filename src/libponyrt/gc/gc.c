@@ -4,6 +4,8 @@
 #include "../mem/pagemap.h"
 #include <string.h>
 #include <assert.h>
+#include "../sched/cpu.h"
+
 
 #define GC_ACTOR_HEAP_EQUIV 1024
 #define GC_IMMUT_HEAP_EQUIV 1024
@@ -128,7 +130,16 @@ static void send_local_object(pony_ctx_t* ctx, void* p, pony_type_t* t,
   int mutability)
 {
   gc_t* gc = ponyint_actor_gc(ctx->current);
+  uint64_t tsc = ponyint_cpu_tick();
   object_t* obj = ponyint_objectmap_getorput(&gc->local, p, gc->mark);
+  uint64_t tsc2 = ponyint_cpu_tick();
+
+  if(is_source(ctx->current))
+  { 
+    ctx->current->obj_time += tsc2 - tsc;
+    ctx->current->obj_count++;
+  }
+
 
   if(obj->mark == gc->mark)
     return;

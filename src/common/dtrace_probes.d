@@ -45,7 +45,7 @@ provider pony {
   /**
    * Fired when the garbage collector finishes sending an object
    */
-  probe gc__send__end(uintptr_t scheduler);
+  probe gc__send__end(uintptr_t scheduler, uint64_t hs_time, uint64_t aq_time);
 
   /**
    * Fired when the garbage collector stats sending an object

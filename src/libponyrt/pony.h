@@ -133,7 +133,7 @@ typedef const struct _pony_type_t
  * 44/80 bytes: gc
  */
 #if INTPTR_MAX == INT64_MAX
-#  define PONY_ACTOR_PAD_SIZE 288
+#  define PONY_ACTOR_PAD_SIZE 352
 #elif INTPTR_MAX == INT32_MAX
 #  define PONY_ACTOR_PAD_SIZE 180
 #endif
