@@ -350,14 +350,6 @@ pony_actor_t* pony_create(pony_ctx_t* ctx, pony_type_t* type)
 
   actor->batch = INITIAL_BATCH;
 
-  actor->send_time = 0;
-  actor->send_time_bhs = 0;
-  actor->send_time_hs = 0;
-  actor->send_time_aq = 0;
-  actor->send_count = 0;
-  actor->obj_count = 0;
-  actor->obj_time = 0;
-
   return actor;
 }
 

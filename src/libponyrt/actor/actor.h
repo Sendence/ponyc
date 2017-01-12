@@ -26,14 +26,6 @@ typedef struct pony_actor_t
   uint8_t flags;
   uint8_t wtype;
   size_t batch;
-  uint32_t obj_count;
-  uint64_t obj_time;
-  uint32_t send_count;
-  uint64_t send_time;
-  uint64_t send_time_bhs;
-  uint64_t send_time_hs;
-  uint64_t send_time_aq;
-  uint64_t send_time_start_ts;
 
   // keep things accessed by other actors on a separate cache line
   __pony_spec_align__(heap_t heap, 64); // 52/104 bytes
