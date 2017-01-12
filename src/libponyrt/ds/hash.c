@@ -123,7 +123,7 @@ static void resize(hashmap_t* map, hash_fn hash, cmp_fn cmp, alloc_fn alloc,
   void* curr = NULL;
 
   map->count = 0;
-  map->size = (s < MIN_HASHMAP_SIZE) ? MIN_HASHMAP_SIZE : s << 5;
+  map->size = (s < MIN_HASHMAP_SIZE) ? MIN_HASHMAP_SIZE : s << 3;
 
   // use a single memory allocation to exploit spatial memory/cache locality
   size_t bitmap_size = map->size/HASHMAP_BITMAP_TYPE_SIZE + (map->size%HASHMAP_BITMAP_TYPE_SIZE==0?0:1);
@@ -441,5 +441,6 @@ void ponyint_hashmap_optimize(hashmap_t* map, hash_fn hash, alloc_fn alloc,
     num_iters++;
   } while(count > 0);
 
-  printf("Optimize took %lu iterations.\n", num_iters);
+  if(num_iters > 5)
+    printf("Optimize took %lu iterations.\n", num_iters);
 }
