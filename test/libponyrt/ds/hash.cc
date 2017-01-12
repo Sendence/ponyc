@@ -126,7 +126,7 @@ TEST_F(HashMapTest, Resize)
   testmap_put(&_map, curr);
 
   ASSERT_EQ((size_t)BELOW_HALF+1, testmap_size(&_map));
-  ASSERT_EQ((size_t)INITIAL_SIZE << 5, _map.contents.size);
+  ASSERT_EQ((size_t)INITIAL_SIZE << 3, _map.contents.size);
 }
 
 /** After having put an element with a
