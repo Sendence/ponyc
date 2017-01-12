@@ -56,7 +56,13 @@ static void resize(hashmap_t* map, hash_fn hash, cmp_fn cmp, alloc_fn alloc,
   void* curr = NULL;
 
   map->count = 0;
-  map->size = (s < 8) ? 8 : s << 5;
+  if(s < 8)
+    map->size = 8;
+  else if(s < 262144)
+    map->size = s << 5;
+  else
+    map->size = s << 1;
+
   map->buckets = (void**)alloc(map->size * sizeof(void*));
   memset(map->buckets, 0, map->size * sizeof(void*));
 
