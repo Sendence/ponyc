@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 #define DELETED ((void*)1)
 
@@ -76,7 +77,7 @@ static bool valid(void* entry)
 }
 
 static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
-  cmp_fn cmp, alloc_fn alloc, free_size_fn fr, bool in_remove)
+  cmp_fn cmp)
 {
   size_t index_del = map->size;
   size_t mask = index_del - 1;
@@ -102,15 +103,7 @@ static void* search(hashmap_t* map, size_t* pos, void* key, hash_fn hash,
       if(index_del > mask)
         index_del = index;
     } else if(cmp(key, elem)) {
-      // found an earlier deleted bucket so move item
-      if(in_remove == false && index_del <= mask)
-      {
-        ponyint_hashmap_removeindex(map, index);
-        ponyint_hashmap_putindex(map, elem, hash, cmp, alloc, fr, index_del);
-        *pos = index_del;
-      } else {
-        *pos = index;
-      }
+      *pos = index;
       return elem;
     }
 
@@ -156,53 +149,6 @@ static void resize(hashmap_t* map, hash_fn hash, cmp_fn cmp, alloc_fn alloc,
 
 }
 
-bool ponyint_hashmap_needs_optimize(hashmap_t* map)
-{
-  // Don't optimize if the hashmap is too small or if the # deleted items is not large enough
-  // TODO: figure out right heuristic for when to optimize
-  if((map->size < MIN_HASHMAP_OPTIMIZE_SIZE) ||
-    (((map->deleted_count << 1) < map->size) &&
-    (((map->optimize_deleted_shift >= 0) ?
-       map->deleted_count << map->optimize_deleted_shift :
-       map->deleted_count >> map->optimize_deleted_shift) < (map->count))))
-    return false;
-
-  return true;
-}
-
-void ponyint_hashmap_finish_optimize(hashmap_t* map, size_t num_optimized)
-{
-//  printf("finish optimize.. size: %lu, count: %lu, deleted_count: %lu, optimize_deleted_shift: %ld, num_optimized: %lu\n", map->size, map->count, map->deleted_count, map->optimize_deleted_shift, num_optimized);
-
-  // reset deleted count to 0 since we only care about new deletions since the last optimize
-  // this is because the deleted elements will accumulate in the hashmap as time goes on
-  // and entries are added and removed
-  map->deleted_count = 0;
-
-
-  // The hashmap is likely to reach steady state where optimize is barely moving any
-  // items because new items get deleted and long lived items are already in optimal
-  // position. The following is a way to identify that and not run optimize as often
-  // in that case to not pay the penalty of hashing the keys all the time
-
-  // back off on when next optimize will occur because we didn't optimize enough entries
-  // during this optimize run to avoid wasting cpu cycles hashing entries that don't move
-  if((num_optimized << MIN_HASHMAP_OPTIMIZATION_SHIFT) < map->count)
-    // only back off to a maximum amount only to ensure that we would eventually run optimize again
-    // TODO: Figure out better heuristic
-    if(map->optimize_deleted_shift >= 0 || (map->optimize_deleted_shift < 0 &&
-      (map->size >> map->optimize_deleted_shift) > 128))
-      map->optimize_deleted_shift--;
-
-  // increase frequency of when next optimize will occur because we optimized too many  entries
-  // during this optimize run to avoid wasting cpu cycles via unnecessary probing
-  if((num_optimized << MAX_HASHMAP_OPTIMIZATION_SHIFT) > map->count)
-    // only increase frequency to a maximum # deleted of 6.25% of count
-    // TODO: Figure out better heuristic
-    if(map->optimize_deleted_shift < 4)
-      map->optimize_deleted_shift++;
-}
-
 size_t ponyint_hashmap_optimize_item(hashmap_t* map, hash_fn hash, alloc_fn alloc,
   free_size_fn fr, cmp_fn cmp, size_t old_index, void* entry)
 {
@@ -219,9 +165,9 @@ size_t ponyint_hashmap_optimize_item(hashmap_t* map, hash_fn hash, alloc_fn allo
       break;
 
     // found an earlier deleted bucket so move item
-    if(map->buckets[index] == DELETED)
+    if(map->buckets[index] == NULL)
     {
-      ponyint_hashmap_removeindex(map, old_index);
+      ponyint_hashmap_clearindex(map, old_index);
       ponyint_hashmap_putindex(map, entry, hash, cmp, alloc, fr, index);
       return 1;
     }
@@ -291,13 +237,12 @@ void ponyint_hashmap_destroy(hashmap_t* map, free_size_fn fr, free_fn free_elem)
   map->item_bitmap = NULL;
 }
 
-void* ponyint_hashmap_get(hashmap_t* map, void* key, hash_fn hash, cmp_fn cmp, size_t* pos,
-  alloc_fn alloc, free_size_fn fr)
+void* ponyint_hashmap_get(hashmap_t* map, void* key, hash_fn hash, cmp_fn cmp, size_t* pos)
 {
   if(map->count == 0)
     return NULL;
 
-  return search(map, pos, key, hash, cmp, alloc, fr, false);
+  return search(map, pos, key, hash, cmp);
 }
 
 void* ponyint_hashmap_put(hashmap_t* map, void* entry, hash_fn hash, cmp_fn cmp,
@@ -307,7 +252,7 @@ void* ponyint_hashmap_put(hashmap_t* map, void* entry, hash_fn hash, cmp_fn cmp,
     ponyint_hashmap_init(map, 4, alloc);
 
   size_t pos;
-  void* elem = search(map, &pos, entry, hash, cmp, alloc, fr, false);
+  void* elem = search(map, &pos, entry, hash, cmp);
 
   map->buckets[pos] = entry;
 
@@ -361,13 +306,13 @@ void* ponyint_hashmap_putindex(hashmap_t* map, void* entry, hash_fn hash, cmp_fn
 }
 
 void* ponyint_hashmap_remove(hashmap_t* map, void* entry, hash_fn hash,
-  cmp_fn cmp, alloc_fn alloc, free_size_fn fr)
+  cmp_fn cmp)
 {
   if(map->count == 0)
     return NULL;
 
   size_t pos;
-  void* elem = search(map, &pos, entry, hash, cmp, alloc, fr, true);
+  void* elem = search(map, &pos, entry, hash, cmp);
 
   if(elem != NULL)
   {
@@ -454,4 +399,47 @@ void* ponyint_hashmap_next(hashmap_t* map, size_t* i)
 size_t ponyint_hashmap_size(hashmap_t* map)
 {
   return map->count;
+}
+
+void* ponyint_hashmap_clearindex(hashmap_t* map, size_t index)
+{
+  if(map->size <= index)
+    return NULL;
+
+  void* elem = map->buckets[index];
+
+  if(!valid(elem))
+    return NULL;
+
+  map->buckets[index] = NULL;
+  map->count--;
+
+  // update item bitmap
+  size_t ib_index = index/HASHMAP_BITMAP_TYPE_SIZE;
+  size_t ib_offset = index%HASHMAP_BITMAP_TYPE_SIZE;
+  map->item_bitmap[ib_index] &= ~((bitmap_t)1 << ib_offset);
+
+  return elem;
+}
+
+void ponyint_hashmap_optimize(hashmap_t* map, hash_fn hash, alloc_fn alloc,
+  free_size_fn fr, cmp_fn cmp)
+{
+  size_t count = 0;
+  size_t num_iters = 0;
+  size_t i = HASHMAP_BEGIN;
+  void* elem;
+
+  do
+  {
+    count = 0;
+    i = HASHMAP_BEGIN;
+    while((elem = ponyint_hashmap_next(map, &i)) != NULL)
+    {
+      count += ponyint_hashmap_optimize_item(map, hash, alloc, fr, cmp, i, elem);
+    }
+    num_iters++;
+  } while(count > 0);
+
+  printf("Optimize took %lu iterations.\n", num_iters);
 }

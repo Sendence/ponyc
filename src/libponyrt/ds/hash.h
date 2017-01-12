@@ -47,16 +47,6 @@ void ponyint_hashmap_init(hashmap_t* map, size_t size, alloc_fn alloc);
 void ponyint_hashmap_destroy(hashmap_t* map, free_size_fn fr,
   free_fn free_elem);
 
-/** Checks whether the hashmap needs optimization or not.
- *
- */
-bool ponyint_hashmap_needs_optimize(hashmap_t* map);
-
-/** Handles bookkeeping for end of optimize.
- *
- */
-void ponyint_hashmap_finish_optimize(hashmap_t* map, size_t num_optimized);
-
 /** Optimize single item at specified index with given pointer/key by moving to an
  *  earlier bucket if it has a deleted entry.
  *
@@ -66,12 +56,16 @@ void ponyint_hashmap_finish_optimize(hashmap_t* map, size_t num_optimized);
 size_t ponyint_hashmap_optimize_item(hashmap_t* map, hash_fn hash, alloc_fn alloc,
   free_size_fn fr, cmp_fn cmp, size_t old_index, void* entry);
 
+/** Optimize hashmap by iterating hashmap and calling optimize_item for each entry.
+ */
+void ponyint_hashmap_optimize(hashmap_t* map, hash_fn hash, alloc_fn alloc,
+  free_size_fn fr, cmp_fn cmp);
+
 /** Retrieve an element from a hash map.
  *
  *  Returns a pointer to the element, or NULL.
  */
-void* ponyint_hashmap_get(hashmap_t* map, void* key, hash_fn hash, cmp_fn cmp, size_t* index,
-  alloc_fn alloc, free_size_fn fr);
+void* ponyint_hashmap_get(hashmap_t* map, void* key, hash_fn hash, cmp_fn cmp, size_t* index);
 
 /** Put a new element in a hash map.
  *
@@ -95,13 +89,19 @@ void* ponyint_hashmap_putindex(hashmap_t* map, void* entry, hash_fn hash, cmp_fn
  *  Returns the element removed (if any).
  */
 void* ponyint_hashmap_remove(hashmap_t* map, void* entry, hash_fn hash,
-  cmp_fn cmp, alloc_fn alloc, free_size_fn fr);
+  cmp_fn cmp);
 
 /** Removes a given entry from a hash map by index.
  *
  *  Returns the element removed (if any).
  */
 void* ponyint_hashmap_removeindex(hashmap_t* map, size_t index);
+
+/** Clears a given entry from a hash map by index.
+ *
+ *  Returns the element clear (if any).
+ */
+void* ponyint_hashmap_clearindex(hashmap_t* map, size_t index);
 
 /** Get the number of elements in the map.
  */
@@ -117,14 +117,14 @@ void* ponyint_hashmap_next(hashmap_t* map, size_t* i);
   typedef struct name_t { hashmap_t contents; } name_t; \
   void name##_init(name_t* map, size_t size); \
   void name##_destroy(name_t* map); \
-  bool name##_needs_optimize(name_t* map); \
-  void name##_finish_optimize(name_t* map, size_t num_optimized); \
   size_t name##_optimize_item(name_t* map, type* entry, size_t old_index); \
+  void name##_optimize(name_t* map); \
   type* name##_get(name_t* map, type* key, size_t* index); \
   type* name##_put(name_t* map, type* entry); \
   type* name##_putindex(name_t* map, type* entry, size_t index); \
   type* name##_remove(name_t* map, type* entry); \
   type* name##_removeindex(name_t* map, size_t index); \
+  type* name##_clearindex(name_t* map, size_t index); \
   size_t name##_size(name_t* map); \
   type* name##_next(name_t* map, size_t* i); \
   void name##_trace(void* map); \
@@ -146,14 +146,6 @@ void* ponyint_hashmap_next(hashmap_t* map, size_t* i);
     name##_free_fn freef = free_elem; \
     ponyint_hashmap_destroy((hashmap_t*)map, fr, (free_fn)freef); \
   } \
-  bool name##_needs_optimize(name_t* map) \
-  { \
-    return ponyint_hashmap_needs_optimize((hashmap_t*)map); \
-  } \
-  void name##_finish_optimize(name_t* map, size_t num_optimized) \
-  { \
-    ponyint_hashmap_finish_optimize((hashmap_t*)map, num_optimized); \
-  } \
   size_t name##_optimize_item(name_t* map, type* entry, size_t old_index) \
   { \
     name##_hash_fn hashf = hash; \
@@ -161,12 +153,19 @@ void* ponyint_hashmap_next(hashmap_t* map, size_t* i);
     return ponyint_hashmap_optimize_item((hashmap_t*)map, \
       (hash_fn)hashf, alloc, fr, (cmp_fn)cmpf, old_index, (void*)entry); \
   } \
+  void name##_optimize(name_t* map) \
+  { \
+    name##_hash_fn hashf = hash; \
+    name##_cmp_fn cmpf = cmp; \
+    return ponyint_hashmap_optimize((hashmap_t*)map, \
+      (hash_fn)hashf, alloc, fr, (cmp_fn)cmpf); \
+  } \
   type* name##_get(name_t* map, type* key, size_t* index) \
   { \
     name##_hash_fn hashf = hash; \
     name##_cmp_fn cmpf = cmp; \
     return (type*)ponyint_hashmap_get((hashmap_t*)map, (void*)key, \
-      (hash_fn)hashf, (cmp_fn)cmpf, index, alloc, fr); \
+      (hash_fn)hashf, (cmp_fn)cmpf, index); \
   } \
   type* name##_put(name_t* map, type* entry) \
   { \
@@ -187,11 +186,15 @@ void* ponyint_hashmap_next(hashmap_t* map, size_t* i);
     name##_hash_fn hashf = hash; \
     name##_cmp_fn cmpf = cmp; \
     return (type*)ponyint_hashmap_remove((hashmap_t*) map, (void*)entry, \
-      (hash_fn)hashf, (cmp_fn)cmpf, alloc, fr); \
+      (hash_fn)hashf, (cmp_fn)cmpf); \
   } \
   type* name##_removeindex(name_t* map, size_t index) \
   { \
     return (type*)ponyint_hashmap_removeindex((hashmap_t*) map, index); \
+  } \
+  type* name##_clearindex(name_t* map, size_t index) \
+  { \
+    return (type*)ponyint_hashmap_clearindex((hashmap_t*) map, index); \
   } \
   size_t name##_size(name_t* map) \
   { \
