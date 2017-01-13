@@ -440,7 +440,4 @@ void ponyint_hashmap_optimize(hashmap_t* map, hash_fn hash, alloc_fn alloc,
     }
     num_iters++;
   } while(count > 0);
-
-  if(num_iters > 5)
-    printf("Optimize took %lu iterations.\n", num_iters);
 }
