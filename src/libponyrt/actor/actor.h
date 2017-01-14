@@ -24,6 +24,7 @@ typedef struct pony_actor_t
   messageq_t q;
   pony_msg_t* continuation;
   uint8_t flags;
+  uint8_t wtype;
   size_t batch;
 
   // keep things accessed by other actors on a separate cache line
@@ -31,7 +32,15 @@ typedef struct pony_actor_t
   gc_t gc; // 44/80 bytes
 } pony_actor_t;
 
-void set_noisey(pony_actor_t* actor);
+bool is_special(pony_actor_t* actor);
+
+bool is_source(pony_actor_t* actor);
+
+bool is_sink(pony_actor_t* actor);
+
+bool is_step(pony_actor_t* actor);
+
+bool is_metrics_sink(pony_actor_t* actor);
 
 bool ponyint_actor_run(pony_ctx_t* ctx, pony_actor_t* actor, size_t batch);
 
