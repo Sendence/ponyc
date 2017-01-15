@@ -361,7 +361,7 @@ class _TestTCPMuteReceiveNotify is TCPConnectionNotify
 
   fun ref accepted(conn: TCPConnection ref) =>
     _h.complete_action("receiver accepted")
-    conn.mute()
+    conn.mute(_h)
     _h.complete_action("receiver muted")
     conn.write("send me some data that i won't ever read")
     _h.complete_action("receiver asks for data")
@@ -440,11 +440,11 @@ class _TestTCPUnmuteReceiveNotify is TCPConnectionNotify
 
   fun ref accepted(conn: TCPConnection ref) =>
     _h.complete_action("receiver accepted")
-    conn.mute()
+    conn.mute(_h)
     _h.complete_action("receiver muted")
     conn.write("send me some data that i won't ever read")
     _h.complete_action("receiver asks for data")
-    conn.unmute()
+    conn.unmute(_h)
     _h.complete_action("receiver unmuted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] val,
@@ -494,7 +494,7 @@ class _TestTCPThrottleReceiveNotify is TCPConnectionNotify
 
   fun ref accepted(conn: TCPConnection ref) =>
     _h.complete_action("receiver accepted")
-    conn.mute()
+    conn.mute(_h)
     _h.complete_action("receiver muted")
     conn.write("send me some data that i won't ever read")
     _h.complete_action("receiver asks for data")

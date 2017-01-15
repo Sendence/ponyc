@@ -175,6 +175,7 @@ actor TCPConnection
   var _expect: USize = 0
 
   var _muted: Bool = false
+  let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
   new create(auth: TCPConnectionAuth, notify: TCPConnectionNotify iso,
     host: String, service: String, from: String = "", init_size: USize = 64,
@@ -320,19 +321,24 @@ actor TCPConnection
       _pending_writes()
     end
 
-  be mute() =>
+  be mute(d: Any tag) =>
     """
     Temporarily suspend reading off this TCPConnection until such time as
     `unmute` is called.
     """
+    _muted_downstream.set(d)
     _muted = true
 
-  be unmute() =>
+  be unmute(d: Any tag) =>
     """
     Start reading off this TCPConnection again after having been muted.
     """
-    _muted = false
-    _pending_reads()
+    _muted_downstream.unset(d)
+
+    if _muted_downstream.size() == 0 then
+      _muted = false
+      _pending_reads()
+    end
 
   be set_notify(notify: TCPConnectionNotify iso) =>
     """
