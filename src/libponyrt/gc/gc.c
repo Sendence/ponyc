@@ -693,7 +693,7 @@ void ponyint_gc_sendacquire(pony_ctx_t* ctx)
     pony_sendp(ctx, aref->actor, ACTORMSG_ACQUIRE, aref);
   }
 
-  assert(ponyint_actormap_size() == 0);
+  assert(ponyint_actormap_size(&ctx->acquire) == 0);
 }
 
 void ponyint_gc_sendrelease(pony_ctx_t* ctx, gc_t* gc)
@@ -712,7 +712,7 @@ void ponyint_gc_sendrelease_manual(pony_ctx_t* ctx)
     pony_sendp(ctx, aref->actor, ACTORMSG_RELEASE, aref);
   }
 
-  assert(ponyint_actormap_size() == 0);
+  assert(ponyint_actormap_size(&ctx->acquire) == 0);
 }
 
 void ponyint_gc_register_final(pony_ctx_t* ctx, void* p, pony_final_fn final)
