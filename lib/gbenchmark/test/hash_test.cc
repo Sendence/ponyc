@@ -46,7 +46,6 @@ struct hash_elem_t
 void HashMapTest::SetUp(const ::benchmark::State& st)
 {
   if (st.thread_index == 0) {
-//    printf("setup; init: %d\n", st.range(0));
     // range(0) == initial size of hashmap
     testmap_init(&_map, st.range(0));
     // range(1) == # of items to insert
@@ -62,12 +61,10 @@ void HashMapTest::TearDown(const ::benchmark::State& st)
   if (st.thread_index == 0) {
     testmap_destroy(&_map);
   }
-//  printf("teardown\n");
 }
 
 void HashMapTest::put_elements(size_t count)
 {
-//  printf("putelements; num: %lu\n", count);
   hash_elem_t* curr = NULL;
 
   for(size_t i = 0; i < count; i++)
@@ -93,7 +90,6 @@ void HashMapTest::delete_elements(size_t del_pct, size_t count)
     if(d != NULL)
       free_elem(d);
   }
-//  printf("deleteelements; pct: %lu, count: %lu, final_size: %lu\n", del_pct, del_count, testmap_size(&_map));
 }
 
 hash_elem_t* HashMapTest::get_element()
@@ -122,19 +118,55 @@ void HashMapTest::free_buckets(size_t len, void* p)
   free(p);
 }
 
+BENCHMARK_DEFINE_F(HashMapTest, HashResize)(benchmark::State& st) {
+  while (st.KeepRunning()) {
+    // exclude time to fill map to exactly 50%
+    size_t old_size = _map.contents.size;
+    put_elements(old_size/2);
+    if(testmap_size(&_map) != (size_t)(old_size/2))
+    {
+      st.SkipWithError("Map should be exactly half filled!");
+      break; // Needed to skip the rest of the iteration.
+    }
+    hash_elem_t* curr = get_element();
+    curr->key = (old_size/2) + 1;
+    st.ResumeTiming();
+    testmap_put(&_map, curr);
+    st.PauseTiming();
+    if(_map.contents.size == old_size)
+    {
+      printf("Shouldn't happen b: count: %lu, size: %lu, old_size: %lu\n", testmap_size(&_map), _map.contents.size, old_size);
+      st.SkipWithError("Map should have resized!");
+      break; // Needed to skip the rest of the iteration.
+    }
+    testmap_destroy(&_map);
+    testmap_init(&_map, st.range(0));
+    st.ResumeTiming();
+  }
+  st.SetItemsProcessed(st.iterations());
+}
+
+BENCHMARK_REGISTER_F(HashMapTest, HashResize)->RangeMultiplier(2)->Ranges({{1, 32<<10}, {0, 0}, {0, 0}, {0, 0}});
+
 BENCHMARK_DEFINE_F(HashMapTest, HashNext)(benchmark::State& st) {
   while (st.KeepRunning()) {
     size_t ind = HASHMAP_UNKNOWN;
     for(size_t i = 0; i < testmap_size(&_map); i++) {
       hash_elem_t* n = testmap_next(&_map, &ind);
       if(n == NULL)
-        printf("shouldn't happen\n");
+      {
+        st.SkipWithError("Item shouldn't be NULL!");
+        break; // Needed to skip the rest of the iteration.
+      }
     }
     hash_elem_t* n = testmap_next(&_map, &ind);
     if(n != NULL)
-      printf("shouldn't happen\n");
-    st.SetItemsProcessed(testmap_size(&_map) + 1);
+    {
+      st.SkipWithError("Item should be NULL!");
+      break; // Needed to skip the rest of the iteration.
+    }
   }
+  st.SetItemsProcessed(st.iterations() * (testmap_size(&_map) + 1));
 }
 
 BENCHMARK_REGISTER_F(HashMapTest, HashNext)->RangeMultiplier(2)->Ranges({{1, 32<<10}, {1, 32}, {0, 0}, {0, 0}});
@@ -149,27 +181,33 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
     size_t num_elems = testmap_size(&_map);
     for(size_t i = 0; i < num_elems; i++) {
       hash_elem_t* n = testmap_next(&_map, &ind);
-      hash_elem_t* n2 = testmap_removeindex(&_map, ind);
-      if(n == NULL || n2 ==  NULL)
-        printf("shouldn't happen\n");
-      free_elem(n2);
+      testmap_clearindex(&_map, ind);
+      if(n == NULL)
+      {
+        st.SkipWithError("Item shouldn't be NULL!");
+        break; // Needed to skip the rest of the iteration.
+      }
+      free_elem(n);
     }
     hash_elem_t* n = testmap_next(&_map, &ind);
     if(n != NULL)
-      printf("shouldn't happen\n");
-    st.ResumeTiming();
+    {
+      st.SkipWithError("Item should be NULL!");
+      break; // Needed to skip the rest of the iteration.
+    }
     for(int i = 0; i < st.range(3); i++)
     {
-      st.PauseTiming();
       // exclude allocating new item time
       curr = get_element();
-      st.ResumeTiming();
       curr->key = i;
 
+      st.ResumeTiming();
       testmap_put(&_map, curr);
+      st.PauseTiming();
     }
-    st.SetItemsProcessed(st.range(3));
+    st.ResumeTiming();
   }
+  st.SetItemsProcessed(st.iterations() * st.range(3));
 }
 
 BENCHMARK_REGISTER_F(HashMapTest, HashPut)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 16<<10}});
@@ -183,27 +221,33 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
     size_t num_elems = testmap_size(&_map);
     for(size_t i = 0; i < num_elems; i++) {
       hash_elem_t* n = testmap_next(&_map, &ind);
-      hash_elem_t* n2 = testmap_removeindex(&_map, ind);
-      if(n == NULL || n2 ==  NULL)
-        printf("shouldn't happen\n");
-      free_elem(n2);
+      testmap_clearindex(&_map, ind);
+      if(n == NULL)
+      {
+        st.SkipWithError("Item shouldn't be NULL!");
+        break; // Needed to skip the rest of the iteration.
+      }
+      free_elem(n);
     }
     hash_elem_t* n = testmap_next(&_map, &ind);
     if(n != NULL)
-      printf("shouldn't happen\n");
-    st.ResumeTiming();
+    {
+      st.SkipWithError("Item should be NULL!");
+      break; // Needed to skip the rest of the iteration.
+    }
     for(int i = 0; i < st.range(3); i++)
     {
-      st.PauseTiming();
       // exclude allocating new item time
       curr = get_element();
-      st.ResumeTiming();
       curr->key = i;
 
+      st.ResumeTiming();
       testmap_putindex(&_map, curr, i);
+      st.PauseTiming();
     }
-    st.SetItemsProcessed(st.range(3));
+    st.ResumeTiming();
   }
+  st.SetItemsProcessed(st.iterations() * st.range(3));
 }
 
 BENCHMARK_REGISTER_F(HashMapTest, HashPutIndex)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 16<<10}});
@@ -214,47 +258,60 @@ BENCHMARK_DEFINE_F(HashMapTest, HashRemove)(benchmark::State& st) {
     st.PauseTiming();
     // exclude inserting items to delete time
     put_elements(st.range(3));
-    st.ResumeTiming();
     for(int i = 0; i < st.range(3); i++)
     {
       curr->key = i;
 
+      st.ResumeTiming();
       hash_elem_t* n2 = testmap_remove(&_map, curr);
+      st.PauseTiming();
       if(n2 != NULL) {
-        st.PauseTiming();
         // exclude memory free time
         free_elem(n2);
-        st.ResumeTiming();
       } else {
-        printf("shouldn't happen; %d not found\n", i);
+        printf("%d not found\n", i);
+        st.SkipWithError("Item shouldn't be NULL!");
+        break; // Needed to skip the rest of the iteration.
       }
     }
-    st.SetItemsProcessed(st.range(3));
+    st.ResumeTiming();
   }
+  st.SetItemsProcessed(st.iterations() * st.range(3));
   free_elem(curr);
 }
 
 BENCHMARK_REGISTER_F(HashMapTest, HashRemove)->RangeMultiplier(2)->Ranges({{1, 1}, {0, 0}, {0, 0}, {1<<10, 32<<10}});
 
 BENCHMARK_DEFINE_F(HashMapTest, HashRemoveIndex)(benchmark::State& st) {
+  hash_elem_t* curr = get_element();
+  size_t ind = HASHMAP_UNKNOWN;
   while (st.KeepRunning()) {
     st.PauseTiming();
     // exclude inserting items to delete time
     put_elements(st.range(3));
-    st.ResumeTiming();
-    size_t max_elems = _map.contents.size;
-    for(size_t i = 0; i < max_elems; i++)
+    for(int i = 0; i < st.range(3); i++)
     {
-      hash_elem_t* n2 = testmap_removeindex(&_map, i);
+      curr->key = i;
+
+      hash_elem_t* n2 = testmap_get(&_map, curr, &ind);
+      st.ResumeTiming();
+
+      testmap_removeindex(&_map, ind);
+
+      st.PauseTiming();
       if(n2 != NULL) {
-        st.PauseTiming();
         // exclude memory free time
         free_elem(n2);
-        st.ResumeTiming();
+      } else {
+        printf("%d not found\n", i);
+        st.SkipWithError("Item shouldn't be NULL!");
+        break; // Needed to skip the rest of the iteration.
       }
     }
-    st.SetItemsProcessed(st.range(3));
+    st.ResumeTiming();
   }
+  st.SetItemsProcessed(st.iterations() * st.range(3));
+  free_elem(curr);
 }
 
 BENCHMARK_REGISTER_F(HashMapTest, HashRemoveIndex)->RangeMultiplier(2)->Ranges({{1, 1}, {0, 0}, {0, 0}, {1<<10, 32<<10}});
@@ -262,18 +319,23 @@ BENCHMARK_REGISTER_F(HashMapTest, HashRemoveIndex)->RangeMultiplier(2)->Ranges({
 BENCHMARK_DEFINE_F(HashMapTest, HashSearch)(benchmark::State& st) {
   hash_elem_t* e1 = get_element();
   while (st.KeepRunning()) {
+    st.PauseTiming();
     for(int i = 0; i < st.range(3); i++) {
-      st.PauseTiming();
       // exclude random # time
       e1->key = rand() % st.range(1);
-      st.ResumeTiming();
       size_t index = HASHMAP_UNKNOWN;
+      st.ResumeTiming();
       hash_elem_t* n2 = testmap_get(&_map, e1, &index);
+      st.PauseTiming();
       if(n2 == NULL)
-        printf("shouldn't happen\n");
+      {
+        st.SkipWithError("Item shouldn't be NULL!");
+        break; // Needed to skip the rest of the iteration.
+      }
     }
-    st.SetItemsProcessed(st.range(3));
+    st.ResumeTiming();
   }
+  st.SetItemsProcessed(st.iterations() * st.range(3));
   free_elem(e1);
   e1 = nullptr;
 }
@@ -296,7 +358,8 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearchDeletes)(benchmark::State& st) {
         if(n != NULL) {
           a[i] = n->key;
         } else {
-          printf("shouldn't happen\n");
+          st.SkipWithError("Item shouldn't be NULL!");
+          break; // Needed to skip the rest of the iteration.
         }
       }
       first_time = false;
@@ -304,17 +367,21 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearchDeletes)(benchmark::State& st) {
     st.ResumeTiming();
 
     for(int i = 0; i < st.range(3); i++) {
-      st.PauseTiming();
       // exclude random # time
       e1->key = a[rand() % testmap_size(&_map)];
-      st.ResumeTiming();
       size_t index = HASHMAP_UNKNOWN;
+      st.ResumeTiming();
       hash_elem_t* n2 = testmap_get(&_map, e1, &index);
+      st.PauseTiming();
       if(n2 == NULL)
-        printf("shouldn't happen\n");
+      {
+        st.SkipWithError("Item shouldn't be NULL!");
+        break; // Needed to skip the rest of the iteration.
+      }
     }
-    st.SetItemsProcessed(st.range(3));
+    st.ResumeTiming();
   }
+  st.SetItemsProcessed(st.iterations() * st.range(3));
   delete[] a;
   free_elem(e1);
   e1 = nullptr;
