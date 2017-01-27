@@ -649,6 +649,22 @@ endef
 
 $(eval $(call EXPAND_UNINSTALL))
 
+ifdef verbose
+  bench_verbose = -DCMAKE_VERBOSE_MAKEFILE=true
+endif
+
+ifeq ($(lto),yes)
+  bench_lto = -DBENCHMARK_ENABLE_LTO=true
+endif
+
+bench: libponyrt
+	@mkdir -p $(PONY_BUILD_DIR)/bench
+	$(SILENT)cd $(PONY_BUILD_DIR)/bench && cmake -G "Unix Makefiles" \
+          -DCMAKE_BUILD_TYPE=$(config) $(bench_verbose) $(bench_lto) \
+          ../../../lib/gbenchmark
+	@cd $(PONY_BUILD_DIR)/bench && make
+	@cd $(PONY_BUILD_DIR)/bench && make test ARGS=--verbose
+
 test: all
 	@$(PONY_BUILD_DIR)/libponyc.tests
 	@$(PONY_BUILD_DIR)/libponyrt.tests
