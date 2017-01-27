@@ -177,5 +177,5 @@ add_subdirectory(src)
 
 if (BENCHMARK_ENABLE_TESTING)
   enable_testing()
-  add_subdirectory(test)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/../../bench bench)
 endif()

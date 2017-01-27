@@ -120,6 +120,7 @@ void HashMapTest::free_buckets(size_t len, void* p)
 
 BENCHMARK_DEFINE_F(HashMapTest, HashResize)(benchmark::State& st) {
   while (st.KeepRunning()) {
+    st.PauseTiming();
     // exclude time to fill map to exactly 50%
     size_t old_size = _map.contents.size;
     put_elements(old_size/2);
