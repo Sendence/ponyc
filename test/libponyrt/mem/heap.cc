@@ -8,7 +8,7 @@
 
 TEST(Heap, Init)
 {
-  pony_actor_t* actor = (pony_actor_t*)0xDEADBEEFDEADBEEF;
+  pony_actor_t* actor = (pony_actor_t*)0xDBEEFDEADBEEF;
 
   heap_t heap;
   ponyint_heap_init(&heap);
