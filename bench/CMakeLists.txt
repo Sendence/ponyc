@@ -17,3 +17,6 @@ endmacro(compile_benchmark_test)
 compile_benchmark_test(hash libponyrt/ds/hash.cc)
 add_test(hash_benchmark hash --benchmark_min_time=0.05)
 
+compile_benchmark_test(heap libponyrt/mem/heap.cc)
+add_test(heap_benchmark heap --benchmark_min_time=0.05)
+
