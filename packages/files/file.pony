@@ -448,12 +448,19 @@ class File
     if _fd != -1 then
       let o: ISize = 0
       let b: I32 = 1
-      let r = @lseek64[I64](_fd, o, b)
-
-      if r < 0 then
-        _errno = _get_error()
+      ifdef osx then
+        let r = @lseek[ILong](_fd, o, b)
+        if r < 0 then
+          _errno = _get_error()
+        end
+        r.usize()
+      else
+        let r = @lseek64[I64](_fd, o, b)
+        if r < 0 then
+          _errno = _get_error()
+        end
+        r.usize()
       end
-      r.usize()
     else
       0
     end
