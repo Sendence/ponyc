@@ -374,7 +374,7 @@ static void pool_block_insert(pool_block_t* block)
 
   while(next != NULL)
   {
-    if(block->size < next->size)
+    if(block->size <= next->size)
       break;
 
     prev = next;

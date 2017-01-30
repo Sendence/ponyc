@@ -144,15 +144,6 @@ static const uint32_t sizeclass_init[HEAP_SIZECLASSES] =
   0x00010000
 };
 
-static const uint32_t sizeclass_entries[HEAP_SIZECLASSES] =
-{
-  32,
-  16,
-  8,
-  4,
-  2
-};
-
 static const uint8_t sizeclass_table[HEAP_MAX / HEAP_MIN] =
 {
   0, 1, 2, 2, 3, 3, 3, 3,
@@ -212,13 +203,7 @@ static struct large_chunk_t* get_large_chunk_next(large_chunk_t* chunk)
 
 static void large_pagemap(char* m, size_t size, large_chunk_t* chunk)
 {
-  char* end = m + size;
-
-  while(m < end)
-  {
-    ponyint_pagemap_set(m, chunk);
-    m += POOL_ALIGN;
-  }
+  ponyint_pagemap_set_bulk(m, chunk, size);
 }
 
 static bool chunk_is_large(chunk_t* chunk)
@@ -283,6 +268,18 @@ static void set_large_chunk_shallow(large_chunk_t* chunk, uint32_t shallow)
 #else
     assert(shallow == 1 || shallow == 0);
     chunk->actor |= ((size_t)shallow << HEAP_LARGE_CHUNK_SHALLOW_SHIFT);
+#endif
+}
+
+static uint32_t get_small_chunk_finalisers(small_chunk_t* chunk)
+{
+#ifdef DONT_USE_COMPACT_HEAP
+    return chunk->finalisers;
+#else
+    uint32_t finalisers = (uint32_t)((chunk->m >> HEAP_HIGH_BITS_SHIFT) << 8);
+    finalisers &= (uint32_t)((chunk->next >> HEAP_HIGH_BITS_SHIFT) << 12);
+    finalisers &= (uint32_t)(chunk->actor >> HEAP_HIGH_BITS_SHIFT);
+    return finalisers;
 #endif
 }
 
@@ -354,22 +351,27 @@ static void final_small(small_chunk_t* chunk, uint32_t mark)
   // run any finalisers that need to be run
   void* p = NULL;
 
+  uint32_t finalisers = get_small_chunk_finalisers(chunk);
+  uint32_t bit = 0;
+
   // look through all finalisers
-  for(uint32_t bit = 0; bit < sizeclass_entries[small_chunk_size(chunk)]; bit++)
-  {
-    // if there's a finaliser to run for a used slot
-    if(get_small_chunk_finaliser_bit(chunk, bit) != 0)
-    {
-      p = get_small_chunk_m(chunk) + (bit << HEAP_MINBITS);
+  // if there's a finaliser to run for a used slot
+  while(0 != (bit = __pony_ffsl(finalisers))) {
+    bit--;
 
-      // run finaliser
-      assert((*(pony_type_t**)p)->final != NULL);
-      (*(pony_type_t**)p)->final(p);
+    p = get_small_chunk_m(chunk) + (bit << HEAP_MINBITS);
 
-      // clear finaliser
-      clear_small_chunk_finaliser_bit(chunk, bit);
-    }
+    // run finaliser
+    assert((*(pony_type_t**)p)->final != NULL);
+    (*(pony_type_t**)p)->final(p);
+
+    // clear finaliser in chunk
+    clear_small_chunk_finaliser_bit(chunk, bit);
+
+    // clear bit just found in our local finaliser map
+    finalisers &= (finalisers - 1);
   }
+
   (void)mark;
 }
 
@@ -378,21 +380,29 @@ static void final_small_freed(small_chunk_t* chunk)
   // run any finalisers that need to be run for any newly freed slots
   void* p = NULL;
 
+  uint32_t finalisers = get_small_chunk_finalisers(chunk);
+  uint32_t bit = 0;
+
   // look through all finalisers
-  for(uint32_t bit = 0; bit < sizeclass_entries[small_chunk_size(chunk)]; bit++)
-  {
-    // if there's a finaliser to run for a free slot
-    if((get_small_chunk_finaliser_bit(chunk, bit) != 0) && ((chunk->slots & (1 << bit)) != 0))
-    {
-      p = get_small_chunk_m(chunk) + (bit << HEAP_MINBITS);
+  // if there's a finaliser to run for a used slot
+  while(0 != (bit = __pony_ffsl(finalisers))) {
+    bit--;
 
-      // run finaliser
-      assert((*(pony_type_t**)p)->final != NULL);
-      (*(pony_type_t**)p)->final(p);
+    // nothing to do if the slot isn't empty
+    if((chunk->slots & (1 << bit)) == 0)
+      continue;
 
-      // clear finaliser
-      clear_small_chunk_finaliser_bit(chunk, bit);
-    }
+    p = get_small_chunk_m(chunk) + (bit << HEAP_MINBITS);
+
+    // run finaliser
+    assert((*(pony_type_t**)p)->final != NULL);
+    (*(pony_type_t**)p)->final(p);
+
+    // clear finaliser in chunk
+    clear_small_chunk_finaliser_bit(chunk, bit);
+
+    // clear bit just found in our local finaliser map
+    finalisers &= (finalisers - 1);
   }
 }
 
