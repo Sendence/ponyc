@@ -14,7 +14,7 @@ typedef struct hash_elem_t hash_elem_t;
 
 DECLARE_HASHMAP(testmap, testmap_t, hash_elem_t)
 
-class HashMapTest: public ::benchmark::Fixture
+class HashMapBench: public ::benchmark::Fixture
 {
   protected:
     testmap_t _map;
@@ -33,9 +33,9 @@ class HashMapTest: public ::benchmark::Fixture
     static void free_buckets(size_t size, void* p);
 };
 
-DEFINE_HASHMAP(testmap, testmap_t, hash_elem_t, HashMapTest::hash_tst,
-  HashMapTest::cmp_tst, malloc, HashMapTest::free_buckets,
-  HashMapTest::free_elem)
+DEFINE_HASHMAP(testmap, testmap_t, hash_elem_t, HashMapBench::hash_tst,
+  HashMapBench::cmp_tst, malloc, HashMapBench::free_buckets,
+  HashMapBench::free_elem)
 
 struct hash_elem_t
 {
@@ -43,7 +43,7 @@ struct hash_elem_t
   size_t val;
 };
 
-void HashMapTest::SetUp(const ::benchmark::State& st)
+void HashMapBench::SetUp(const ::benchmark::State& st)
 {
   if (st.thread_index == 0) {
     // range(0) == initial size of hashmap
@@ -56,14 +56,14 @@ void HashMapTest::SetUp(const ::benchmark::State& st)
   }
 }
 
-void HashMapTest::TearDown(const ::benchmark::State& st)
+void HashMapBench::TearDown(const ::benchmark::State& st)
 {
   if (st.thread_index == 0) {
     testmap_destroy(&_map);
   }
 }
 
-void HashMapTest::put_elements(size_t count)
+void HashMapBench::put_elements(size_t count)
 {
   hash_elem_t* curr = NULL;
 
@@ -76,7 +76,7 @@ void HashMapTest::put_elements(size_t count)
   }
 }
 
-void HashMapTest::delete_elements(size_t del_pct, size_t count)
+void HashMapBench::delete_elements(size_t del_pct, size_t count)
 {
   hash_elem_t* e1 = get_element();
   size_t del_count = del_pct/100.0 * count;
@@ -92,33 +92,33 @@ void HashMapTest::delete_elements(size_t del_pct, size_t count)
   }
 }
 
-hash_elem_t* HashMapTest::get_element()
+hash_elem_t* HashMapBench::get_element()
 {
   return (hash_elem_t*) malloc(sizeof(hash_elem_t));
 }
 
-size_t HashMapTest::hash_tst(hash_elem_t* p)
+size_t HashMapBench::hash_tst(hash_elem_t* p)
 {
   return ponyint_hash_size(p->key);
 }
 
-bool HashMapTest::cmp_tst(hash_elem_t* a, hash_elem_t* b)
+bool HashMapBench::cmp_tst(hash_elem_t* a, hash_elem_t* b)
 {
   return a->key == b->key;
 }
 
-void HashMapTest::free_elem(hash_elem_t* p)
+void HashMapBench::free_elem(hash_elem_t* p)
 {
   free(p);
 }
 
-void HashMapTest::free_buckets(size_t len, void* p)
+void HashMapBench::free_buckets(size_t len, void* p)
 {
   (void)len;
   free(p);
 }
 
-BENCHMARK_DEFINE_F(HashMapTest, HashResize)(benchmark::State& st) {
+BENCHMARK_DEFINE_F(HashMapBench, HashResize)(benchmark::State& st) {
   while (st.KeepRunning()) {
     st.PauseTiming();
     // exclude time to fill map to exactly 50%
@@ -147,9 +147,9 @@ BENCHMARK_DEFINE_F(HashMapTest, HashResize)(benchmark::State& st) {
   st.SetItemsProcessed(st.iterations());
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashResize)->RangeMultiplier(2)->Ranges({{1, 32<<10}, {0, 0}, {0, 0}, {0, 0}});
+BENCHMARK_REGISTER_F(HashMapBench, HashResize)->RangeMultiplier(2)->Ranges({{1, 32<<10}, {0, 0}, {0, 0}, {0, 0}});
 
-BENCHMARK_DEFINE_F(HashMapTest, HashNext)(benchmark::State& st) {
+BENCHMARK_DEFINE_F(HashMapBench, HashNext)(benchmark::State& st) {
   while (st.KeepRunning()) {
     size_t ind = HASHMAP_UNKNOWN;
     for(size_t i = 0; i < testmap_size(&_map); i++) {
@@ -170,10 +170,10 @@ BENCHMARK_DEFINE_F(HashMapTest, HashNext)(benchmark::State& st) {
   st.SetItemsProcessed(st.iterations() * (testmap_size(&_map) + 1));
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashNext)->RangeMultiplier(2)->Ranges({{1, 32<<10}, {1, 32}, {0, 0}, {0, 0}});
-BENCHMARK_REGISTER_F(HashMapTest, HashNext)->RangeMultiplier(2)->Ranges({{1, 1}, {1, 32<<10}, {0, 0}, {0, 0}});
+BENCHMARK_REGISTER_F(HashMapBench, HashNext)->RangeMultiplier(2)->Ranges({{1, 32<<10}, {1, 32}, {0, 0}, {0, 0}});
+BENCHMARK_REGISTER_F(HashMapBench, HashNext)->RangeMultiplier(2)->Ranges({{1, 1}, {1, 32<<10}, {0, 0}, {0, 0}});
 
-BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
+BENCHMARK_DEFINE_F(HashMapBench, HashPut)(benchmark::State& st) {
   hash_elem_t* curr = NULL;
   while (st.KeepRunning()) {
     st.PauseTiming();
@@ -211,9 +211,9 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPut)(benchmark::State& st) {
   st.SetItemsProcessed(st.iterations() * st.range(3));
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashPut)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 16<<10}});
+BENCHMARK_REGISTER_F(HashMapBench, HashPut)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 16<<10}});
 
-BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
+BENCHMARK_DEFINE_F(HashMapBench, HashPutIndex)(benchmark::State& st) {
   hash_elem_t* curr = NULL;
   while (st.KeepRunning()) {
     st.PauseTiming();
@@ -251,9 +251,9 @@ BENCHMARK_DEFINE_F(HashMapTest, HashPutIndex)(benchmark::State& st) {
   st.SetItemsProcessed(st.iterations() * st.range(3));
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashPutIndex)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 16<<10}});
+BENCHMARK_REGISTER_F(HashMapBench, HashPutIndex)->RangeMultiplier(2)->Ranges({{32<<10, 32<<10}, {0, 0}, {0, 0}, {1<<10, 16<<10}});
 
-BENCHMARK_DEFINE_F(HashMapTest, HashRemove)(benchmark::State& st) {
+BENCHMARK_DEFINE_F(HashMapBench, HashRemove)(benchmark::State& st) {
   hash_elem_t* curr = get_element();
   while (st.KeepRunning()) {
     st.PauseTiming();
@@ -281,9 +281,9 @@ BENCHMARK_DEFINE_F(HashMapTest, HashRemove)(benchmark::State& st) {
   free_elem(curr);
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashRemove)->RangeMultiplier(2)->Ranges({{1, 1}, {0, 0}, {0, 0}, {1<<10, 32<<10}});
+BENCHMARK_REGISTER_F(HashMapBench, HashRemove)->RangeMultiplier(2)->Ranges({{1, 1}, {0, 0}, {0, 0}, {1<<10, 32<<10}});
 
-BENCHMARK_DEFINE_F(HashMapTest, HashRemoveIndex)(benchmark::State& st) {
+BENCHMARK_DEFINE_F(HashMapBench, HashRemoveIndex)(benchmark::State& st) {
   hash_elem_t* curr = get_element();
   size_t ind = HASHMAP_UNKNOWN;
   while (st.KeepRunning()) {
@@ -315,9 +315,9 @@ BENCHMARK_DEFINE_F(HashMapTest, HashRemoveIndex)(benchmark::State& st) {
   free_elem(curr);
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashRemoveIndex)->RangeMultiplier(2)->Ranges({{1, 1}, {0, 0}, {0, 0}, {1<<10, 32<<10}});
+BENCHMARK_REGISTER_F(HashMapBench, HashRemoveIndex)->RangeMultiplier(2)->Ranges({{1, 1}, {0, 0}, {0, 0}, {1<<10, 32<<10}});
 
-BENCHMARK_DEFINE_F(HashMapTest, HashSearch)(benchmark::State& st) {
+BENCHMARK_DEFINE_F(HashMapBench, HashSearch)(benchmark::State& st) {
   hash_elem_t* e1 = get_element();
   while (st.KeepRunning()) {
     st.PauseTiming();
@@ -341,9 +341,9 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearch)(benchmark::State& st) {
   e1 = nullptr;
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashSearch)->RangeMultiplier(2)->Ranges({{1, 1}, {1<<10, 32<<10}, {0, 0}, {64, 1024}});
+BENCHMARK_REGISTER_F(HashMapBench, HashSearch)->RangeMultiplier(2)->Ranges({{1, 1}, {1<<10, 32<<10}, {0, 0}, {64, 1024}});
 
-BENCHMARK_DEFINE_F(HashMapTest, HashSearchDeletes)(benchmark::State& st) {
+BENCHMARK_DEFINE_F(HashMapBench, HashSearchDeletes)(benchmark::State& st) {
   hash_elem_t* e1 = get_element();
   bool first_time = true;
   size_t *a = NULL;
@@ -388,6 +388,6 @@ BENCHMARK_DEFINE_F(HashMapTest, HashSearchDeletes)(benchmark::State& st) {
   e1 = nullptr;
 }
 
-BENCHMARK_REGISTER_F(HashMapTest, HashSearchDeletes)->RangeMultiplier(2)->Ranges({{1, 1}, {1<<10, 32<<10}, {64, 90}, {64, 1024}});
+BENCHMARK_REGISTER_F(HashMapBench, HashSearchDeletes)->RangeMultiplier(2)->Ranges({{1, 1}, {1<<10, 32<<10}, {64, 90}, {64, 1024}});
 
 BENCHMARK_MAIN()

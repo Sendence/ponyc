@@ -482,7 +482,6 @@ static void deferred(pony_ctx_t* ctx, detector_t* d)
 
   d->attempted++;
 
-  bool needs_optimize = false;
   bool found = false;
   size_t i = HASHMAP_BEGIN;
   view_t* view;
@@ -490,8 +489,12 @@ static void deferred(pony_ctx_t* ctx, detector_t* d)
   while((view = ponyint_viewmap_next(&d->deferred, &i)) != NULL)
   {
     assert(view->deferred == true);
-    ponyint_viewmap_clearindex(&d->deferred, i);
-    needs_optimize = true;
+    ponyint_viewmap_removeindex(&d->deferred, i);
+
+    // always scan again from same index because robin hood hashmap
+    // will shift delete items
+    i--;
+
     view->deferred = false;
 
     if(!detect(ctx, d, view))
@@ -499,9 +502,6 @@ static void deferred(pony_ctx_t* ctx, detector_t* d)
 
     found = true;
   }
-
-  if(needs_optimize)
-    ponyint_viewmap_optimize(&d->deferred);
 
   if(found)
   {

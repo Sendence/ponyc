@@ -430,11 +430,7 @@ void* ponyint_hashmap_next(size_t* i, size_t count, bitmap_t* item_bitmap,
   while(index < size)
   {
     // find first set bit using ffs
-#ifdef PLATFORM_IS_ILP32
-    ffs_offset = __pony_ffs(ib);
-#else
     ffs_offset = __pony_ffsl(ib);
-#endif
 
     // if no bits set; increment index to next item bitmap entry
     if(ffs_offset == 0)
