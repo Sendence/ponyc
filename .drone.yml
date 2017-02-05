@@ -75,11 +75,11 @@ publish:
 notify:
   slack:
     webhook_url: $$SLACK_WEBHOOK
-    channel: b-drone-ci
+    channel: b-ci-status
     username: drone-ci
     template: >
-      build `#{{ build.number }}` for {{repo.clone_url}} for commit `{{build.commit}}` 
-      in branch `{{build.branch}}` by `@{{build.author}}` with a message ```{{build.message}}``` 
+      build `#{{ build.number }}` for {{repo.clone_url}} for commit `{{build.commit}}`
+      in branch `{{build.branch}}` by `@{{build.author}}` with a message ```{{build.message}}```
       finished with a `{{ build.status }}` status in
       {{ duration build.started_at build.finished_at }}
       Build logs at: https://drone.sendence.com/{{repo.full_name}}/{{ build.number }}
