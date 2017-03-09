@@ -1,5 +1,5 @@
 
-FROM sendence/ponyc-runner:0.0.5
+FROM sendence/ponyc-runner:0.0.6
 
 COPY . /build
 
