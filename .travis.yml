@@ -191,8 +191,8 @@ install:
       fi;
       if [ "${LLVM_VERSION}" = "3.9.0" ];
       then
-        brew install llvm;
-        brew link --overwrite --force llvm;
+        brew install llvm@3.9;
+        brew link --overwrite --force llvm@3.9;
         mkdir llvmsym;
         ln -s `which llvm-config` llvmsym/llvm-config-3.9;
         ln -s `which clang++` llvmsym/clang++-3.9;
