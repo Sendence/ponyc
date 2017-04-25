@@ -11,6 +11,11 @@
 #include <assert.h>
 #include <dtrace.h>
 
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <sys/syscall.h> 
+
+
 #ifdef USE_VALGRIND
 #include <valgrind/helgrind.h>
 #endif
@@ -414,18 +419,30 @@ void pony_continuation(pony_actor_t* self, pony_msg_t* m)
   self->continuation = m;
 }
 
-void* pony_alloc(pony_ctx_t* ctx, size_t size)
+void* pony_alloc ( pony_ctx_t* ctx, size_t size )
 {
-  DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, size);
-
-  return ponyint_heap_alloc(ctx->current, &ctx->current->heap, size);
+	DTRACE2(HEAP_ALLOC, (uintptr_t) ctx->scheduler, size);
+	if (size == 32)
+	{
+		for (int i = 0; i < 5; i++)
+		{
+			// inserted to alter timings
+		}
+	}
+	return ponyint_heap_alloc(ctx->current, &ctx->current->heap, size);
 }
 
-void* pony_alloc_small(pony_ctx_t* ctx, uint32_t sizeclass)
+void* pony_alloc_small ( pony_ctx_t* ctx, uint32_t sizeclass )
 {
-  DTRACE2(HEAP_ALLOC, (uintptr_t)ctx->scheduler, HEAP_MIN << sizeclass);
-
-  return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass);
+	DTRACE2(HEAP_ALLOC, (uintptr_t) ctx->scheduler, HEAP_MIN << sizeclass);
+	if (sizeclass == 32)
+	{
+		for (int i = 0; i < 5; i++)
+		{
+			// inserted to alter timings
+		}
+	}
+	return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass);
 }
 
 void* pony_alloc_large(pony_ctx_t* ctx, size_t size)
