@@ -23,6 +23,9 @@
 #define INITIAL_BATCH 100
 #define INCR_BATCH 50
 
+volatile int spinlock=0;
+
+
 enum
 {
   FLAG_BLOCKED = 1 << 0,
@@ -422,27 +425,23 @@ void pony_continuation(pony_actor_t* self, pony_msg_t* m)
 void* pony_alloc ( pony_ctx_t* ctx, size_t size )
 {
 	DTRACE2(HEAP_ALLOC, (uintptr_t) ctx->scheduler, size);
-	if (size == 32)
-	{
-		for (int i = 0; i < 5; i++)
-		{
-			// inserted to alter timings
-		}
-	}
-	return ponyint_heap_alloc(ctx->current, &ctx->current->heap, size);
+	while (__sync_lock_test_and_set(&spinlock, 1))
+		while (spinlock)
+			;
+	void* rv = ponyint_heap_alloc(ctx->current, &ctx->current->heap, size);
+	__sync_lock_release(&spinlock);
+	return rv;
 }
 
 void* pony_alloc_small ( pony_ctx_t* ctx, uint32_t sizeclass )
 {
 	DTRACE2(HEAP_ALLOC, (uintptr_t) ctx->scheduler, HEAP_MIN << sizeclass);
-	if (sizeclass == 32)
-	{
-		for (int i = 0; i < 5; i++)
-		{
-			// inserted to alter timings
-		}
-	}
-	return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass);
+	while (__sync_lock_test_and_set(&spinlock, 1))
+		while (spinlock)
+			;
+	void* rv = ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass);
+	__sync_lock_release(&spinlock);
+	return rv;
 }
 
 void* pony_alloc_large(pony_ctx_t* ctx, size_t size)
