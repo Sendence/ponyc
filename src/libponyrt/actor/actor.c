@@ -23,8 +23,6 @@
 #define INITIAL_BATCH 100
 #define INCR_BATCH 50
 
-volatile int spinlock=0;
-
 
 enum
 {
@@ -425,23 +423,21 @@ void pony_continuation(pony_actor_t* self, pony_msg_t* m)
 void* pony_alloc ( pony_ctx_t* ctx, size_t size )
 {
 	DTRACE2(HEAP_ALLOC, (uintptr_t) ctx->scheduler, size);
-	while (__sync_lock_test_and_set(&spinlock, 1))
-		while (spinlock)
-			;
-	void* rv = ponyint_heap_alloc(ctx->current, &ctx->current->heap, size);
-	__sync_lock_release(&spinlock);
-	return rv;
+	if ( size==32 )
+	  {
+	    printf ("sz:%d\n",(int)size);
+	  }
+	return ponyint_heap_alloc(ctx->current, &ctx->current->heap, size);
 }
 
 void* pony_alloc_small ( pony_ctx_t* ctx, uint32_t sizeclass )
 {
 	DTRACE2(HEAP_ALLOC, (uintptr_t) ctx->scheduler, HEAP_MIN << sizeclass);
-	while (__sync_lock_test_and_set(&spinlock, 1))
-		while (spinlock)
-			;
-	void* rv = ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass);
-	__sync_lock_release(&spinlock);
-	return rv;
+	if ( sizeclass == 32 ) 
+	  {
+	    printf ("sz:%d\n", (int)sizeclass);
+	  }
+	return ponyint_heap_alloc_small(ctx->current, &ctx->current->heap, sizeclass);
 }
 
 void* pony_alloc_large(pony_ctx_t* ctx, size_t size)
