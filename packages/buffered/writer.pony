@@ -316,7 +316,7 @@ class Writer
     end
 
   fun ref _check(size': USize) =>
-    if (_current.size() - _offset) < size' then
+    if (_current.space() - _offset) < size' then
       _current.undefined(_offset + size')
     end
 
